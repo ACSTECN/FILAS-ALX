@@ -36,4 +36,5 @@ export type QueueFilters = {
   cidade: City | "Todas";
   hotzone: Hotzone | "Todas";
   turno_desejado: Shift | "Todos";
+  data_fila: string | "Todas";
 };

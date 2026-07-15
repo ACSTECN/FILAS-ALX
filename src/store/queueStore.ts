@@ -8,6 +8,7 @@ const defaultFilters: QueueFilters = {
   cidade: "Todas",
   hotzone: "Todas",
   turno_desejado: "Todos",
+  data_fila: "Todas",
 };
 
 type QueueStore = {

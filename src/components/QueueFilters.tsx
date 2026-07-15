@@ -19,7 +19,7 @@ export function QueueFilters({ filters, onChange }: QueueFiltersProps) {
         Filtros da fila
       </div>
 
-      <div className="grid flex-1 gap-3 md:grid-cols-3">
+      <div className="grid flex-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         <select
           value={filters.cidade}
           onChange={(event) =>
@@ -72,6 +72,26 @@ export function QueueFilters({ filters, onChange }: QueueFiltersProps) {
             </option>
           ))}
         </select>
+
+        <div className="flex gap-2">
+          <input
+            type="date"
+            value={filters.data_fila === "Todas" ? "" : filters.data_fila}
+            onChange={(event) =>
+              onChange({
+                data_fila: event.target.value || "Todas",
+              })
+            }
+            className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none"
+          />
+          <button
+            type="button"
+            onClick={() => onChange({ data_fila: "Todas" })}
+            className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-slate-300 transition hover:border-white/20 hover:text-white"
+          >
+            Limpar
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -36,8 +36,9 @@ export default function Home() {
       const byShift =
         filters.turno_desejado === "Todos" ||
         record.turno_desejado === filters.turno_desejado;
+      const byDate = filters.data_fila === "Todas" || record.data_fila === filters.data_fila;
 
-      return byCity && byHotzone && byShift;
+      return byCity && byHotzone && byShift && byDate;
     });
   }, [filters, queue]);
 

@@ -67,7 +67,7 @@ export default function Home() {
                 <img
                   src="/logofilas.png"
                   alt="ALX Filas"
-                  className="h-20 w-auto rounded-[28px] border border-white/10 bg-black/30 p-3 shadow-[0_18px_70px_rgba(0,0,0,0.45)] sm:h-24"
+                  className="h-24 w-auto rounded-[28px] border border-white/10 bg-black/30 p-3 shadow-[0_18px_70px_rgba(0,0,0,0.45)] sm:h-28"
                 />
                 <span className="inline-flex items-center gap-2 rounded-full border border-[#2563eb]/30 bg-[#2563eb]/10 px-4 py-2 text-xs uppercase tracking-[0.28em] text-[#dbeafe]">
                   <RadioTower className="h-4 w-4" />
@@ -115,11 +115,21 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="mt-8 flex flex-wrap items-center gap-4">
-            <CitySwitch activeCity={activeCity} onChange={changeCity} />
-            <p className="text-sm text-slate-400">
-              Selecione a cidade e escolha a hotzone antes de cadastrar.
-            </p>
+          <div className="mt-8 flex flex-col gap-4 rounded-[28px] border border-white/10 bg-black/15 p-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap items-center gap-4">
+              <CitySwitch activeCity={activeCity} onChange={changeCity} />
+              <p className="text-sm text-slate-400">
+                Selecione a cidade e escolha a hotzone antes de cadastrar.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3 text-xs uppercase tracking-[0.24em] text-slate-400">
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-2">
+                limpeza diaria automatica
+              </span>
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-2">
+                realtime compartilhado
+              </span>
+            </div>
           </div>
         </div>
 
@@ -175,6 +185,30 @@ export default function Home() {
             />
           </aside>
         </div>
+
+        <footer className="mt-10 rounded-[32px] border border-white/10 bg-black/20 px-6 py-5 backdrop-blur">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm font-medium text-white">ALX Filas</p>
+              <p className="mt-1 text-sm text-slate-400">
+                Direitos reservados por TWINEX TECH.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <img
+                src="/logotwinex.png"
+                alt="Twinex Tech"
+                className="h-14 w-auto rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-2"
+              />
+              <p className="text-right text-xs uppercase tracking-[0.24em] text-slate-400">
+                TWINEX TECH
+                <br />
+                tecnologia e automacao
+              </p>
+            </div>
+          </div>
+        </footer>
       </section>
     </main>
   );

@@ -28,11 +28,11 @@ export function QueueFilters({ filters, onChange }: QueueFiltersProps) {
               hotzone: "Todas",
             })
           }
-          className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none"
+          className="alx-field rounded-2xl border border-white/10 px-4 py-3 text-sm text-white outline-none"
         >
-          <option value="Todas">Todas as cidades</option>
-          <option value="Rio de Janeiro">Rio de Janeiro</option>
-          <option value="São Paulo">São Paulo</option>
+          <option value="Todas" className="bg-slate-950 text-white">Todas as cidades</option>
+          <option value="Rio de Janeiro" className="bg-slate-950 text-white">Rio de Janeiro</option>
+          <option value="São Paulo" className="bg-slate-950 text-white">São Paulo</option>
         </select>
 
         <select
@@ -40,9 +40,9 @@ export function QueueFilters({ filters, onChange }: QueueFiltersProps) {
           onChange={(event) =>
             onChange({ hotzone: event.target.value as QueueFiltersType["hotzone"] })
           }
-          className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none"
+          className="alx-field rounded-2xl border border-white/10 px-4 py-3 text-sm text-white outline-none"
         >
-          <option value="Todas">Todas as hotzones</option>
+          <option value="Todas" className="bg-slate-950 text-white">Todas as hotzones</option>
           {allHotzones
             .filter((hotzone) =>
               filters.cidade === "Todas"
@@ -50,7 +50,7 @@ export function QueueFilters({ filters, onChange }: QueueFiltersProps) {
                 : hotzonesByCity[filters.cidade].includes(hotzone),
             )
             .map((hotzone) => (
-              <option key={hotzone} value={hotzone}>
+              <option key={hotzone} value={hotzone} className="bg-slate-950 text-white">
                 {hotzone}
               </option>
             ))}
@@ -63,11 +63,11 @@ export function QueueFilters({ filters, onChange }: QueueFiltersProps) {
               turno_desejado: event.target.value as QueueFiltersType["turno_desejado"],
             })
           }
-          className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none"
+          className="alx-field rounded-2xl border border-white/10 px-4 py-3 text-sm text-white outline-none"
         >
-          <option value="Todos">Todos os turnos</option>
+          <option value="Todos" className="bg-slate-950 text-white">Todos os turnos</option>
           {shiftOptions.map((shift) => (
-            <option key={shift} value={shift}>
+            <option key={shift} value={shift} className="bg-slate-950 text-white">
               {shift}
             </option>
           ))}
@@ -82,12 +82,12 @@ export function QueueFilters({ filters, onChange }: QueueFiltersProps) {
                 data_fila: event.target.value || "Todas",
               })
             }
-            className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none"
+            className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-sm text-white outline-none"
           />
           <button
             type="button"
             onClick={() => onChange({ data_fila: "Todas" })}
-            className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-slate-300 transition hover:border-white/20 hover:text-white"
+            className="alx-field rounded-2xl border border-white/10 px-4 py-3 text-sm text-slate-300 transition hover:border-white/20 hover:text-white"
           >
             Limpar
           </button>

@@ -48,7 +48,7 @@ export function QueueForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-[32px] border border-white/10 bg-[#07111f]/85 p-6 shadow-[0_24px_90px_rgba(2,6,23,0.48)] backdrop-blur"
+      className="alx-card rounded-[32px] border border-white/10 p-6 shadow-[0_24px_90px_rgba(2,6,23,0.48)] backdrop-blur"
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -69,7 +69,7 @@ export function QueueForm({
             value={codigo}
             onChange={(event) => setCodigo(event.target.value)}
             placeholder="Digite seu identificador"
-            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-[#f97316]/60"
+            className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-[#2563eb]/60"
           />
         </label>
 
@@ -79,7 +79,7 @@ export function QueueForm({
             value={nome}
             onChange={(event) => setNome(event.target.value)}
             placeholder="Digite seu nome"
-            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-[#f97316]/60"
+            className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-[#2563eb]/60"
           />
         </label>
 
@@ -88,9 +88,9 @@ export function QueueForm({
           <select
             value={activeCity}
             disabled
-            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none"
+            className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none"
           >
-            <option>{activeCity}</option>
+            <option className="bg-slate-950 text-white">{activeCity}</option>
           </select>
         </label>
 
@@ -99,10 +99,12 @@ export function QueueForm({
           <select
             value={selectedHotzone}
             disabled
-            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none"
+            className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none"
           >
             {cityHotzones.map((hotzone) => (
-              <option key={hotzone}>{hotzone}</option>
+              <option key={hotzone} className="bg-slate-950 text-white">
+                {hotzone}
+              </option>
             ))}
           </select>
         </label>
@@ -112,10 +114,12 @@ export function QueueForm({
           <select
             value={turno}
             onChange={(event) => setTurno(event.target.value as Shift)}
-            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none transition focus:border-[#f97316]/60"
+            className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none transition focus:border-[#2563eb]/60"
           >
             {shiftOptions.map((shift) => (
-              <option key={shift}>{shift}</option>
+              <option key={shift} className="bg-slate-950 text-white">
+                {shift}
+              </option>
             ))}
           </select>
         </label>
@@ -126,7 +130,7 @@ export function QueueForm({
             type="date"
             value={dataFila}
             onChange={(event) => setDataFila(event.target.value)}
-            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none transition focus:border-[#f97316]/60"
+            className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none transition focus:border-[#2563eb]/60"
           />
         </label>
       </div>
@@ -134,7 +138,7 @@ export function QueueForm({
       <button
         type="submit"
         disabled={syncing}
-        className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#2563eb] via-[#3b82f6] to-[#f97316] px-5 py-4 text-sm font-semibold text-slate-950 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
+        className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#2563eb] via-[#38bdf8] to-[#f97316] px-5 py-4 text-sm font-semibold text-slate-950 shadow-[0_20px_60px_rgba(37,99,235,0.28)] transition hover:-translate-y-0.5 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
       >
         {syncing ? (
           <>

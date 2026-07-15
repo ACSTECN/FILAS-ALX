@@ -42,10 +42,10 @@ export function QueueList({
       {records.map((record, index) => (
         <article
           key={record.id}
-          className="grid gap-4 rounded-[28px] border border-white/10 bg-[#07111f]/90 p-5 lg:grid-cols-[88px_1.4fr_1fr_160px]"
+          className="alx-card grid gap-4 rounded-[28px] border border-white/10 p-5 shadow-[0_18px_60px_rgba(2,6,23,0.28)] lg:grid-cols-[88px_1.4fr_1fr_160px]"
         >
           <div className="flex items-center gap-4 lg:block">
-            <span className="inline-flex rounded-2xl bg-[#f97316]/15 px-4 py-3 text-2xl font-semibold text-[#ffedd5]">
+            <span className="inline-flex rounded-2xl bg-gradient-to-br from-[#2563eb]/25 to-[#f97316]/20 px-4 py-3 text-2xl font-semibold text-white">
               {formatPosition(index)}
             </span>
             <div className="lg:mt-4">
@@ -73,7 +73,9 @@ export function QueueList({
             <p className="text-xs uppercase tracking-[0.22em] text-slate-500">
               Turno desejado
             </p>
-            <p className="mt-1 text-sm text-slate-200">{record.turno_desejado}</p>
+            <span className="mt-2 inline-flex rounded-full border border-[#38bdf8]/30 bg-[#0f172a] px-3 py-1 text-sm font-medium text-[#dbeafe] shadow-[0_10px_30px_rgba(15,23,42,0.35)]">
+              {record.turno_desejado}
+            </span>
             <p className="mt-4 text-xs uppercase tracking-[0.22em] text-slate-500">
               Data da fila
             </p>

@@ -23,6 +23,14 @@ export function formatDate(value: string) {
   }).format(new Date(`${value}T00:00:00`));
 }
 
+export function getTodayKey() {
+  return new Date().toLocaleDateString("en-CA");
+}
+
+export function isExpiredQueueDate(value: string) {
+  return value < getTodayKey();
+}
+
 export function formatPosition(index: number) {
   return String(index + 1).padStart(2, "0");
 }

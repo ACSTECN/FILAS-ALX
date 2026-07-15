@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { canUseLocalFallback, supabase } from "@/lib/supabase";
+import { getTodayKey, isExpiredQueueDate } from "@/lib/format";
 import type { QueueFilters, QueueFormValues, QueueRecord } from "@/types/queue";
 
 const LOCAL_STORAGE_KEY = "alx-entregas-fila";
@@ -49,7 +50,13 @@ function writeLocalQueue(records: QueueRecord[]) {
 }
 
 function normalizeQueue(records: QueueRecord[]) {
-  return [...records].sort((a, b) => a.criado_em.localeCompare(b.criado_em));
+  return [...records]
+    .map((record) => ({
+      ...record,
+      data_fila: record.data_fila ?? record.criado_em.slice(0, 10),
+    }))
+    .filter((record) => !isExpiredQueueDate(record.data_fila))
+    .sort((a, b) => a.criado_em.localeCompare(b.criado_em));
 }
 
 export const useQueueStore = create<QueueStore>((set) => ({
@@ -66,9 +73,15 @@ export const useQueueStore = create<QueueStore>((set) => ({
     set({ loading: true, error: null });
 
     if (supabase) {
+      const todayKey = getTodayKey();
+
+      // Limpa automaticamente registros vencidos assim que o painel abre.
+      await supabase.from("fila_registros").delete().lt("data_fila", todayKey);
+
       const { data, error } = await supabase
         .from("fila_registros")
         .select("*")
+        .gte("data_fila", todayKey)
         .order("criado_em", { ascending: true });
 
       if (error) {
@@ -93,7 +106,9 @@ export const useQueueStore = create<QueueStore>((set) => ({
       return;
     }
 
-    set({ queue: readLocalQueue(), loading: false, error: null });
+    const localQueue = readLocalQueue();
+    writeLocalQueue(localQueue);
+    set({ queue: localQueue, loading: false, error: null });
   },
   createRecord: async (values) => {
     set({ syncing: true, error: null });

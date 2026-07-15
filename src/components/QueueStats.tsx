@@ -44,11 +44,11 @@ export function QueueStats({ activeCity, queue }: QueueStatsProps) {
       {cards.map((card) => (
         <article
           key={card.label}
-          className="rounded-[28px] border border-white/10 bg-white/5 p-5 shadow-[0_18px_70px_rgba(15,23,42,0.18)]"
+          className="rounded-[28px] border border-white/10 bg-white/5 p-5 shadow-[0_18px_70px_rgba(2,6,23,0.35)] backdrop-blur"
         >
           <div className="flex items-center justify-between">
             <p className="text-sm text-slate-300">{card.label}</p>
-            <card.icon className="h-5 w-5 text-[#f97316]" />
+            <card.icon className="h-5 w-5 text-[#2563eb]" />
           </div>
           <p className="mt-5 text-3xl font-semibold text-white">{card.value}</p>
           <p className="mt-2 text-sm text-slate-400">{card.detail}</p>

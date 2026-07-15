@@ -45,7 +45,7 @@ export function QueueForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-[32px] border border-white/10 bg-[#07111f]/90 p-6 shadow-[0_24px_90px_rgba(2,6,23,0.45)]"
+      className="rounded-[32px] border border-white/10 bg-[#07111f]/85 p-6 shadow-[0_24px_90px_rgba(2,6,23,0.48)] backdrop-blur"
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -121,7 +121,7 @@ export function QueueForm({
       <button
         type="submit"
         disabled={syncing}
-        className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#f97316] px-5 py-4 text-sm font-semibold text-slate-950 transition hover:bg-[#fb923c] disabled:cursor-not-allowed disabled:opacity-70"
+        className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#2563eb] via-[#3b82f6] to-[#f97316] px-5 py-4 text-sm font-semibold text-slate-950 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
       >
         {syncing ? (
           <>

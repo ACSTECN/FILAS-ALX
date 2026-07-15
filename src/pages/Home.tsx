@@ -54,14 +54,25 @@ export default function Home() {
     <main className="min-h-screen bg-[#020617] text-white">
       <div className="absolute inset-0 -z-10 overflow-hidden">
         <div className="absolute left-0 top-0 h-[420px] w-[420px] rounded-full bg-[#0f766e]/20 blur-3xl" />
-        <div className="absolute right-0 top-24 h-[340px] w-[340px] rounded-full bg-[#f97316]/20 blur-3xl" />
+        <div className="absolute right-0 top-24 h-[340px] w-[340px] rounded-full bg-[#2563eb]/25 blur-3xl" />
         <div className="absolute bottom-0 left-1/3 h-[300px] w-[300px] rounded-full bg-[#1d4ed8]/15 blur-3xl" />
       </div>
 
       <section className="mx-auto max-w-7xl px-4 pb-10 pt-6 sm:px-6 lg:px-8">
-        <div className="rounded-[36px] border border-white/10 bg-[linear-gradient(135deg,rgba(15,23,42,0.98),rgba(5,10,20,0.94))] p-6 shadow-[0_40px_120px_rgba(2,6,23,0.55)] sm:p-8">
+        <div className="alx-panel alx-glow alx-sheen rounded-[36px] border border-white/10 p-6 sm:p-8">
           <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
             <div className="max-w-3xl">
+              <div className="flex flex-wrap items-center gap-4">
+                <img
+                  src="/logofilas.png"
+                  alt="ALX Filas"
+                  className="h-14 w-auto rounded-2xl border border-white/10 bg-black/30 p-2 shadow-[0_18px_70px_rgba(0,0,0,0.45)] sm:h-16"
+                />
+                <span className="inline-flex items-center gap-2 rounded-full border border-[#2563eb]/30 bg-[#2563eb]/10 px-4 py-2 text-xs uppercase tracking-[0.28em] text-[#dbeafe]">
+                  <RadioTower className="h-4 w-4" />
+                  Operacao ao vivo
+                </span>
+              </div>
               <span className="inline-flex items-center gap-2 rounded-full border border-[#f97316]/30 bg-[#f97316]/10 px-4 py-2 text-xs uppercase tracking-[0.28em] text-[#ffedd5]">
                 <RadioTower className="h-4 w-4" />
                 ALX Entregas ao vivo

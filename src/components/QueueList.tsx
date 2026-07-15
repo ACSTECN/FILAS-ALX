@@ -1,5 +1,5 @@
 import { LoaderCircle, Trash2 } from "lucide-react";
-import { formatClock, formatDateTime, formatPosition } from "@/lib/format";
+import { formatClock, formatDate, formatDateTime, formatPosition } from "@/lib/format";
 import type { QueueRecord } from "@/types/queue";
 
 type QueueListProps = {
@@ -74,6 +74,10 @@ export function QueueList({
               Turno desejado
             </p>
             <p className="mt-1 text-sm text-slate-200">{record.turno_desejado}</p>
+            <p className="mt-4 text-xs uppercase tracking-[0.22em] text-slate-500">
+              Data da fila
+            </p>
+            <p className="mt-1 text-sm text-slate-200">{formatDate(record.data_fila)}</p>
             <p className="mt-4 text-xs uppercase tracking-[0.22em] text-slate-500">
               Registrado em
             </p>

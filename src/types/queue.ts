@@ -19,6 +19,7 @@ export type QueueRecord = {
   cidade: City;
   hotzone: Hotzone;
   turno_desejado: Shift;
+  data_fila: string;
   criado_em: string;
 };
 
@@ -28,6 +29,7 @@ export type QueueFormValues = {
   cidade: City;
   hotzone: Hotzone;
   turno_desejado: Shift;
+  data_fila: string;
 };
 
 export type QueueFilters = {

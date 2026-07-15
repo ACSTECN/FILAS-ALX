@@ -20,6 +20,7 @@ create table if not exists public.fila_registros (
     turno_desejado text not null check (
         turno_desejado in ('Manhã', 'Tarde', 'Noite', 'Madrugada', 'Flexível')
     ),
+    data_fila date not null default current_date,
     criado_em timestamptz not null default now()
 );
 

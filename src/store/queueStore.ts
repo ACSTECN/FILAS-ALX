@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { supabase } from "@/lib/supabase";
+import { canUseLocalFallback, supabase } from "@/lib/supabase";
 import type { QueueFilters, QueueFormValues, QueueRecord } from "@/types/queue";
 
 const LOCAL_STORAGE_KEY = "alx-entregas-fila";
@@ -83,6 +83,15 @@ export const useQueueStore = create<QueueStore>((set) => ({
       return;
     }
 
+    if (!canUseLocalFallback) {
+      set({
+        queue: [],
+        loading: false,
+        error: "Supabase nao conectado neste deploy. Configure a URL e a anon key na Vercel.",
+      });
+      return;
+    }
+
     set({ queue: readLocalQueue(), loading: false, error: null });
   },
   createRecord: async (values) => {
@@ -98,6 +107,14 @@ export const useQueueStore = create<QueueStore>((set) => ({
 
       await useQueueStore.getState().loadQueue();
       set({ syncing: false });
+      return;
+    }
+
+    if (!canUseLocalFallback) {
+      set({
+        syncing: false,
+        error: "Nao foi possivel entrar na fila sem Supabase configurado no deploy.",
+      });
       return;
     }
 
@@ -124,6 +141,14 @@ export const useQueueStore = create<QueueStore>((set) => ({
 
       await useQueueStore.getState().loadQueue();
       set({ syncing: false });
+      return;
+    }
+
+    if (!canUseLocalFallback) {
+      set({
+        syncing: false,
+        error: "Nao foi possivel retirar da fila sem Supabase configurado no deploy.",
+      });
       return;
     }
 

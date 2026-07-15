@@ -19,6 +19,7 @@ export function QueueForm({
   const [codigo, setCodigo] = useState("");
   const [nome, setNome] = useState("");
   const [turno, setTurno] = useState<Shift>("Flexível");
+  const [dataFila, setDataFila] = useState(() => new Date().toISOString().slice(0, 10));
 
   const cityHotzones = useMemo(() => hotzonesByCity[activeCity], [activeCity]);
 
@@ -35,11 +36,13 @@ export function QueueForm({
       cidade: activeCity,
       hotzone: selectedHotzone,
       turno_desejado: turno,
+      data_fila: dataFila,
     });
 
     setCodigo("");
     setNome("");
     setTurno("Flexível");
+    setDataFila(new Date().toISOString().slice(0, 10));
   };
 
   return (
@@ -115,6 +118,16 @@ export function QueueForm({
               <option key={shift}>{shift}</option>
             ))}
           </select>
+        </label>
+
+        <label className="space-y-2 text-sm text-slate-300 md:col-span-2">
+          <span>Data da fila</span>
+          <input
+            type="date"
+            value={dataFila}
+            onChange={(event) => setDataFila(event.target.value)}
+            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none transition focus:border-[#f97316]/60"
+          />
         </label>
       </div>
 

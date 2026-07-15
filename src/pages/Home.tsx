@@ -66,7 +66,7 @@ export default function Home() {
                 <img
                   src="/logofilas.png"
                   alt="ALX Filas"
-                  className="h-14 w-auto rounded-2xl border border-white/10 bg-black/30 p-2 shadow-[0_18px_70px_rgba(0,0,0,0.45)] sm:h-16"
+                  className="h-20 w-auto rounded-[28px] border border-white/10 bg-black/30 p-3 shadow-[0_18px_70px_rgba(0,0,0,0.45)] sm:h-24"
                 />
                 <span className="inline-flex items-center gap-2 rounded-full border border-[#2563eb]/30 bg-[#2563eb]/10 px-4 py-2 text-xs uppercase tracking-[0.28em] text-[#dbeafe]">
                   <RadioTower className="h-4 w-4" />
@@ -129,13 +129,6 @@ export default function Home() {
         {error ? (
           <div className="mt-6 rounded-[24px] border border-rose-500/20 bg-rose-500/10 px-5 py-4 text-sm text-rose-100">
             {error}
-          </div>
-        ) : null}
-
-        {!hasSupabaseConfig ? (
-          <div className="mt-6 rounded-[24px] border border-amber-500/20 bg-amber-500/10 px-5 py-4 text-sm text-amber-50">
-            O painel esta funcionando em modo local. Para ativar Supabase, crie o
-            arquivo `.env` com `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
           </div>
         ) : null}
 

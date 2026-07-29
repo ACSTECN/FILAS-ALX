@@ -38,7 +38,7 @@ create index if not exists fila_registros_status_idx
 alter table public.fila_registros enable row level security;
 
 grant usage on schema public to anon, authenticated;
-grant select, insert, delete on public.fila_registros to anon, authenticated;
+grant select, insert, update, delete on public.fila_registros to anon, authenticated;
 
 drop policy if exists fila_select_public on public.fila_registros;
 create policy fila_select_public
@@ -60,5 +60,13 @@ on public.fila_registros
 for delete
 to anon, authenticated
 using (true);
+
+drop policy if exists fila_update_public on public.fila_registros;
+create policy fila_update_public
+on public.fila_registros
+for update
+to anon, authenticated
+using (true)
+with check (true);
 
 alter publication supabase_realtime add table public.fila_registros;

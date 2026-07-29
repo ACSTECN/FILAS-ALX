@@ -204,6 +204,7 @@ export default function Home() {
               activeCity={activeCity}
               selectedHotzone={selectedHotzone}
               syncing={syncing}
+              analystName={analystName}
               onSubmit={createRecord}
             />
           </aside>

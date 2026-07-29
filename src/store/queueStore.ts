@@ -76,6 +76,7 @@ function normalizeQueue(records: QueueRecord[]) {
       analista: record.analista ?? null,
     }))
     .filter((record) => !isExpiredQueueDate(record.data_fila))
+    .filter((record) => record.status === "na_fila")
     .sort((a, b) => a.criado_em.localeCompare(b.criado_em));
 }
 
@@ -107,6 +108,7 @@ export const useQueueStore = create<QueueStore>((set) => ({
         .from("fila_registros")
         .select("*")
         .gte("data_fila", todayKey)
+        .eq("status", "na_fila")
         .order("criado_em", { ascending: true });
 
       if (error) {

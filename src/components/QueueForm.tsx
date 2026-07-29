@@ -7,6 +7,7 @@ type QueueFormProps = {
   activeCity: City;
   selectedHotzone: Hotzone;
   syncing: boolean;
+  analystName: string;
   onSubmit: (values: QueueFormValues) => Promise<void>;
 };
 
@@ -14,19 +15,27 @@ export function QueueForm({
   activeCity,
   selectedHotzone,
   syncing,
+  analystName,
   onSubmit,
 }: QueueFormProps) {
   const [codigo, setCodigo] = useState("");
   const [nome, setNome] = useState("");
   const [turno, setTurno] = useState<Shift>("Flexível");
   const [dataFila, setDataFila] = useState(() => new Date().toISOString().slice(0, 10));
+  const [formError, setFormError] = useState<string | null>(null);
 
   const cityHotzones = useMemo(() => hotzonesByCity[activeCity], [activeCity]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setFormError(null);
 
     if (!codigo.trim() || !nome.trim()) {
+      return;
+    }
+
+    if (!analystName.trim()) {
+      setFormError("Digite o nome do analista para liberar o cadastro.");
       return;
     }
 
@@ -135,9 +144,15 @@ export function QueueForm({
         </label>
       </div>
 
+      {formError ? (
+        <div className="mt-5 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+          {formError}
+        </div>
+      ) : null}
+
       <button
         type="submit"
-        disabled={syncing}
+        disabled={syncing || !analystName.trim()}
         className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#2563eb] via-[#38bdf8] to-[#f97316] px-5 py-4 text-sm font-semibold text-slate-950 shadow-[0_20px_60px_rgba(37,99,235,0.28)] transition hover:-translate-y-0.5 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
       >
         {syncing ? (
@@ -147,7 +162,7 @@ export function QueueForm({
           </>
         ) : (
           <>
-            Entrar agora
+            {analystName.trim() ? "Entrar agora" : "Informe o analista"}
             <ArrowRight className="h-4 w-4" />
           </>
         )}

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { BellElectric, DatabaseZap, Map, RadioTower } from "lucide-react";
 import { CitySwitch } from "@/components/CitySwitch";
 import { HotzoneGrid } from "@/components/HotzoneGrid";
+import { AnalystRanking } from "@/components/AnalystRanking";
 import { QueueFilters } from "@/components/QueueFilters";
 import { QueueForm } from "@/components/QueueForm";
 import { QueueList } from "@/components/QueueList";
@@ -13,6 +14,7 @@ import { useQueueStore } from "@/store/queueStore";
 import type { City, QueueFilters as QueueFiltersType } from "@/types/queue";
 
 export default function Home() {
+  const [activeTab, setActiveTab] = useState<"fila" | "ranking">("fila");
   const [activeCity, setActiveCity] = useState<City>("Rio de Janeiro");
   const [selectedHotzone, setSelectedHotzone] = useState(
     hotzonesByCity["Rio de Janeiro"][0],
@@ -131,7 +133,7 @@ export default function Home() {
             </div>
             <div className="flex flex-wrap gap-3 text-xs uppercase tracking-[0.24em] text-slate-400">
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-2">
-                limpeza diaria automatica
+                historico preservado
               </span>
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-2">
                 realtime compartilhado
@@ -140,8 +142,32 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="mt-6">
+        <div className="mt-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <QueueStats activeCity={activeCity} queue={queue} />
+          <div className="flex items-center gap-2 self-start rounded-[22px] border border-white/10 bg-white/5 p-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab("fila")}
+              className={
+                activeTab === "fila"
+                  ? "rounded-[18px] bg-white/10 px-4 py-2 text-sm font-semibold text-white"
+                  : "rounded-[18px] px-4 py-2 text-sm text-slate-300 transition hover:text-white"
+              }
+            >
+              Fila
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("ranking")}
+              className={
+                activeTab === "ranking"
+                  ? "rounded-[18px] bg-white/10 px-4 py-2 text-sm font-semibold text-white"
+                  : "rounded-[18px] px-4 py-2 text-sm text-slate-300 transition hover:text-white"
+              }
+            >
+              Ranking
+            </button>
+          </div>
         </div>
 
         {error ? (
@@ -150,65 +176,71 @@ export default function Home() {
           </div>
         ) : null}
 
-        <div className="mt-6 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-          <section className="space-y-6">
-            <div className="rounded-[32px] border border-white/10 bg-white/[0.04] p-6">
-              <div className="mb-5 flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.28em] text-slate-500">
-                    Hotzones
+        {activeTab === "ranking" ? (
+          <div className="mt-6">
+            <AnalystRanking />
+          </div>
+        ) : (
+          <div className="mt-6 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+            <section className="space-y-6">
+              <div className="rounded-[32px] border border-white/10 bg-white/[0.04] p-6">
+                <div className="mb-5 flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.28em] text-slate-500">
+                      Hotzones
+                    </p>
+                    <h2 className="mt-2 text-2xl font-semibold text-white">
+                      Quadrados operacionais
+                    </h2>
+                  </div>
+                  <p className="text-sm text-slate-400">
+                    Hotzone selecionada: {selectedHotzone}
                   </p>
-                  <h2 className="mt-2 text-2xl font-semibold text-white">
-                    Quadrados operacionais
-                  </h2>
                 </div>
-                <p className="text-sm text-slate-400">
-                  Hotzone selecionada: {selectedHotzone}
+                <HotzoneGrid
+                  city={activeCity}
+                  selectedHotzone={selectedHotzone}
+                  queue={queue}
+                  onSelect={setSelectedHotzone}
+                />
+              </div>
+
+              <QueueFilters filters={filters} onChange={changeFilters} />
+              <QueueList
+                records={filteredQueue}
+                loading={loading}
+                syncing={syncing}
+                onRemove={removeRecord}
+                onAssign={handleAssign}
+              />
+            </section>
+
+            <aside className="xl:sticky xl:top-6 xl:self-start">
+              <div className="alx-card mb-6 rounded-[32px] border border-white/10 p-6 backdrop-blur">
+                <p className="text-xs uppercase tracking-[0.32em] text-[#38bdf8]">
+                  Operacao
+                </p>
+                <h3 className="mt-3 text-xl font-semibold text-white">Analista</h3>
+                <input
+                  value={analystName}
+                  onChange={(event) => setAnalystName(event.target.value)}
+                  placeholder="Digite seu nome (analista)"
+                  className="alx-field mt-5 w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-[#38bdf8]/60"
+                />
+                <p className="mt-3 text-sm text-slate-400">
+                  Esse nome vai aparecer quando voce atribuir um entregador.
                 </p>
               </div>
-              <HotzoneGrid
-                city={activeCity}
+              <QueueForm
+                activeCity={activeCity}
                 selectedHotzone={selectedHotzone}
-                queue={queue}
-                onSelect={setSelectedHotzone}
+                syncing={syncing}
+                analystName={analystName}
+                onSubmit={createRecord}
               />
-            </div>
-
-            <QueueFilters filters={filters} onChange={changeFilters} />
-            <QueueList
-              records={filteredQueue}
-              loading={loading}
-              syncing={syncing}
-              onRemove={removeRecord}
-              onAssign={handleAssign}
-            />
-          </section>
-
-          <aside className="xl:sticky xl:top-6 xl:self-start">
-            <div className="alx-card mb-6 rounded-[32px] border border-white/10 p-6 backdrop-blur">
-              <p className="text-xs uppercase tracking-[0.32em] text-[#38bdf8]">
-                Operacao
-              </p>
-              <h3 className="mt-3 text-xl font-semibold text-white">Analista</h3>
-              <input
-                value={analystName}
-                onChange={(event) => setAnalystName(event.target.value)}
-                placeholder="Digite seu nome (analista)"
-                className="alx-field mt-5 w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-[#38bdf8]/60"
-              />
-              <p className="mt-3 text-sm text-slate-400">
-                Esse nome vai aparecer quando voce atribuir um entregador.
-              </p>
-            </div>
-            <QueueForm
-              activeCity={activeCity}
-              selectedHotzone={selectedHotzone}
-              syncing={syncing}
-              analystName={analystName}
-              onSubmit={createRecord}
-            />
-          </aside>
-        </div>
+            </aside>
+          </div>
+        )}
 
         <footer className="mt-10 rounded-[32px] border border-white/10 bg-black/20 px-6 py-5 backdrop-blur">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">

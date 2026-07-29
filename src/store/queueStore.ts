@@ -102,8 +102,6 @@ export const useQueueStore = create<QueueStore>((set) => ({
     if (supabase) {
       const todayKey = getTodayKey();
 
-      await supabase.from("fila_registros").delete().lt("data_fila", todayKey);
-
       const { data, error } = await supabase
         .from("fila_registros")
         .select("*")
@@ -181,7 +179,14 @@ export const useQueueStore = create<QueueStore>((set) => ({
     set({ syncing: true, error: null });
 
     if (supabase) {
-      const { error } = await supabase.from("fila_registros").delete().eq("id", id);
+      const analystName = useQueueStore.getState().analystName.trim();
+      const { error } = await supabase
+        .from("fila_registros")
+        .update({
+          status: "retirado",
+          analista: analystName ? analystName : null,
+        } as never)
+        .eq("id", id);
 
       if (error) {
         set({ syncing: false, error: "Nao foi possivel retirar da fila." });
@@ -201,7 +206,18 @@ export const useQueueStore = create<QueueStore>((set) => ({
       return;
     }
 
-    const nextQueue = useQueueStore.getState().queue.filter((record) => record.id !== id);
+    const analystName = useQueueStore.getState().analystName.trim();
+    const nextQueue = normalizeQueue(
+      useQueueStore.getState().queue.map((record) =>
+        record.id === id
+          ? {
+              ...record,
+              status: "retirado",
+              analista: analystName ? analystName : null,
+            }
+          : record,
+      ),
+    );
     writeLocalQueue(nextQueue);
     set({ queue: nextQueue, syncing: false });
   },

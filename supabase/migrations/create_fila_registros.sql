@@ -21,7 +21,7 @@ create table if not exists public.fila_registros (
         turno_desejado in ('Manhã', 'Tarde', 'Noite', 'Madrugada', 'Flexível')
     ),
     data_fila date not null default current_date,
-    status text not null default 'na_fila' check (status in ('na_fila', 'atribuido')),
+    status text not null default 'na_fila' check (status in ('na_fila', 'atribuido', 'retirado')),
     analista text,
     criado_em timestamptz not null default now()
 );
@@ -38,7 +38,7 @@ create index if not exists fila_registros_status_idx
 alter table public.fila_registros enable row level security;
 
 grant usage on schema public to anon, authenticated;
-grant select, insert, update, delete on public.fila_registros to anon, authenticated;
+grant select, insert, update on public.fila_registros to anon, authenticated;
 
 drop policy if exists fila_select_public on public.fila_registros;
 create policy fila_select_public
@@ -53,13 +53,6 @@ on public.fila_registros
 for insert
 to anon, authenticated
 with check (true);
-
-drop policy if exists fila_delete_public on public.fila_registros;
-create policy fila_delete_public
-on public.fila_registros
-for delete
-to anon, authenticated
-using (true);
 
 drop policy if exists fila_update_public on public.fila_registros;
 create policy fila_update_public

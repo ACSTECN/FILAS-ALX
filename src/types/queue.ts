@@ -12,7 +12,7 @@ export type Hotzone =
   | "Paulista"
   | "Santo Amaro";
 
-export type QueueStatus = "na_fila" | "atribuido";
+export type QueueStatus = "na_fila" | "atribuido" | "retirado";
 
 export type QueueRecord = {
   id: string;

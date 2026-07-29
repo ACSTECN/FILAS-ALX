@@ -24,8 +24,11 @@ export default function Home() {
   const syncing = useQueueStore((state) => state.syncing);
   const error = useQueueStore((state) => state.error);
   const setFilters = useQueueStore((state) => state.setFilters);
+  const analystName = useQueueStore((state) => state.analystName);
+  const setAnalystName = useQueueStore((state) => state.setAnalystName);
   const createRecord = useQueueStore((state) => state.createRecord);
   const removeRecord = useQueueStore((state) => state.removeRecord);
+  const assignRecord = useQueueStore((state) => state.assignRecord);
 
   useQueueRealtime();
 
@@ -49,6 +52,10 @@ export default function Home() {
 
   const changeFilters = (nextFilters: Partial<QueueFiltersType>) => {
     setFilters(nextFilters);
+  };
+
+  const handleAssign = async (id: string) => {
+    await assignRecord(id, analystName);
   };
 
   return (
@@ -173,10 +180,26 @@ export default function Home() {
               loading={loading}
               syncing={syncing}
               onRemove={removeRecord}
+              onAssign={handleAssign}
             />
           </section>
 
           <aside className="xl:sticky xl:top-6 xl:self-start">
+            <div className="alx-card mb-6 rounded-[32px] border border-white/10 p-6 backdrop-blur">
+              <p className="text-xs uppercase tracking-[0.32em] text-[#38bdf8]">
+                Operacao
+              </p>
+              <h3 className="mt-3 text-xl font-semibold text-white">Analista</h3>
+              <input
+                value={analystName}
+                onChange={(event) => setAnalystName(event.target.value)}
+                placeholder="Digite seu nome (analista)"
+                className="alx-field mt-5 w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-[#38bdf8]/60"
+              />
+              <p className="mt-3 text-sm text-slate-400">
+                Esse nome vai aparecer quando voce atribuir um entregador.
+              </p>
+            </div>
             <QueueForm
               activeCity={activeCity}
               selectedHotzone={selectedHotzone}

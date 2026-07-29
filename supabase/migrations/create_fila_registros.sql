@@ -21,6 +21,8 @@ create table if not exists public.fila_registros (
         turno_desejado in ('Manhã', 'Tarde', 'Noite', 'Madrugada', 'Flexível')
     ),
     data_fila date not null default current_date,
+    status text not null default 'na_fila' check (status in ('na_fila', 'atribuido')),
+    analista text,
     criado_em timestamptz not null default now()
 );
 
@@ -29,6 +31,9 @@ create index if not exists fila_registros_criado_em_idx
 
 create index if not exists fila_registros_cidade_hotzone_idx
     on public.fila_registros (cidade, hotzone);
+
+create index if not exists fila_registros_status_idx
+    on public.fila_registros (status);
 
 alter table public.fila_registros enable row level security;
 

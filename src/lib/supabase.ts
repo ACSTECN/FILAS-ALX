@@ -25,6 +25,7 @@ export const supabase = hasSupabaseConfig
           fila_registros: {
             Row: QueueRecord;
             Insert: QueueFormValues;
+            Update: Partial<QueueRecord>;
           };
         };
       };

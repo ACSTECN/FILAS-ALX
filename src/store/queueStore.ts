@@ -4,6 +4,7 @@ import { getTodayKey, isExpiredQueueDate } from "@/lib/format";
 import type { QueueFilters, QueueFormValues, QueueRecord } from "@/types/queue";
 
 const LOCAL_STORAGE_KEY = "alx-entregas-fila";
+const ANALYST_STORAGE_KEY = "alx-entregas-analista";
 
 const defaultFilters: QueueFilters = {
   cidade: "Todas",
@@ -15,15 +16,32 @@ const defaultFilters: QueueFilters = {
 type QueueStore = {
   queue: QueueRecord[];
   filters: QueueFilters;
+  analystName: string;
   loading: boolean;
   syncing: boolean;
   error: string | null;
   setFilters: (filters: Partial<QueueFilters>) => void;
+  setAnalystName: (value: string) => void;
   loadQueue: () => Promise<void>;
   createRecord: (values: QueueFormValues) => Promise<void>;
   removeRecord: (id: string) => Promise<void>;
+  assignRecord: (id: string, analystName: string) => Promise<void>;
   replaceQueue: (records: QueueRecord[]) => void;
 };
+
+function readLocalAnalyst() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  return window.localStorage.getItem(ANALYST_STORAGE_KEY) ?? "";
+}
+
+function writeLocalAnalyst(value: string) {
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(ANALYST_STORAGE_KEY, value);
+  }
+}
 
 function readLocalQueue() {
   if (typeof window === "undefined") {
@@ -54,6 +72,8 @@ function normalizeQueue(records: QueueRecord[]) {
     .map((record) => ({
       ...record,
       data_fila: record.data_fila ?? record.criado_em.slice(0, 10),
+      status: record.status ?? "na_fila",
+      analista: record.analista ?? null,
     }))
     .filter((record) => !isExpiredQueueDate(record.data_fila))
     .sort((a, b) => a.criado_em.localeCompare(b.criado_em));
@@ -62,6 +82,7 @@ function normalizeQueue(records: QueueRecord[]) {
 export const useQueueStore = create<QueueStore>((set) => ({
   queue: [],
   filters: defaultFilters,
+  analystName: readLocalAnalyst(),
   loading: true,
   syncing: false,
   error: null,
@@ -69,13 +90,17 @@ export const useQueueStore = create<QueueStore>((set) => ({
     set((state) => ({
       filters: { ...state.filters, ...filters },
     })),
+  setAnalystName: (value) => {
+    const nextValue = value.trimStart();
+    writeLocalAnalyst(nextValue);
+    set({ analystName: nextValue });
+  },
   loadQueue: async () => {
     set({ loading: true, error: null });
 
     if (supabase) {
       const todayKey = getTodayKey();
 
-      // Limpa automaticamente registros vencidos assim que o painel abre.
       await supabase.from("fila_registros").delete().lt("data_fila", todayKey);
 
       const { data, error } = await supabase
@@ -114,7 +139,11 @@ export const useQueueStore = create<QueueStore>((set) => ({
     set({ syncing: true, error: null });
 
     if (supabase) {
-      const { error } = await supabase.from("fila_registros").insert(values as never);
+      const { error } = await supabase.from("fila_registros").insert({
+        ...values,
+        status: "na_fila",
+        analista: null,
+      } as never);
 
       if (error) {
         set({ syncing: false, error: "Nao foi possivel entrar na fila." });
@@ -137,6 +166,8 @@ export const useQueueStore = create<QueueStore>((set) => ({
     const nextRecord: QueueRecord = {
       id: crypto.randomUUID(),
       ...values,
+      status: "na_fila",
+      analista: null,
       criado_em: new Date().toISOString(),
     };
     const nextQueue = normalizeQueue([...useQueueStore.getState().queue, nextRecord]);
@@ -169,6 +200,54 @@ export const useQueueStore = create<QueueStore>((set) => ({
     }
 
     const nextQueue = useQueueStore.getState().queue.filter((record) => record.id !== id);
+    writeLocalQueue(nextQueue);
+    set({ queue: nextQueue, syncing: false });
+  },
+  assignRecord: async (id, analystName) => {
+    set({ syncing: true, error: null });
+
+    const trimmed = analystName.trim();
+    if (!trimmed) {
+      set({ syncing: false, error: "Informe o nome do analista para atribuir." });
+      return;
+    }
+
+    if (supabase) {
+      const { error } = await supabase
+        .from("fila_registros")
+        .update({ status: "atribuido", analista: trimmed } as never)
+        .eq("id", id);
+
+      if (error) {
+        set({ syncing: false, error: "Nao foi possivel atribuir esse entregador." });
+        return;
+      }
+
+      await useQueueStore.getState().loadQueue();
+      set({ syncing: false });
+      return;
+    }
+
+    if (!canUseLocalFallback) {
+      set({
+        syncing: false,
+        error: "Nao foi possivel atribuir sem Supabase configurado no deploy.",
+      });
+      return;
+    }
+
+    const nextQueue = normalizeQueue(
+      useQueueStore.getState().queue.map((record) =>
+        record.id === id
+          ? {
+              ...record,
+              status: "atribuido",
+              analista: trimmed,
+            }
+          : record,
+      ),
+    );
+
     writeLocalQueue(nextQueue);
     set({ queue: nextQueue, syncing: false });
   },

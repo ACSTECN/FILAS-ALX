@@ -12,6 +12,8 @@ export type Hotzone =
   | "Paulista"
   | "Santo Amaro";
 
+export type QueueStatus = "na_fila" | "atribuido";
+
 export type QueueRecord = {
   id: string;
   codigo_pessoa: string;
@@ -20,6 +22,8 @@ export type QueueRecord = {
   hotzone: Hotzone;
   turno_desejado: Shift;
   data_fila: string;
+  status: QueueStatus;
+  analista: string | null;
   criado_em: string;
 };
 
@@ -30,6 +34,8 @@ export type QueueFormValues = {
   hotzone: Hotzone;
   turno_desejado: Shift;
   data_fila: string;
+  status?: QueueStatus;
+  analista?: string | null;
 };
 
 export type QueueFilters = {

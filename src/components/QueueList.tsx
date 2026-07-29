@@ -1,4 +1,4 @@
-import { LoaderCircle, Trash2 } from "lucide-react";
+import { CheckCircle2, LoaderCircle, Trash2 } from "lucide-react";
 import { formatClock, formatDate, formatDateTime, formatPosition } from "@/lib/format";
 import type { QueueRecord } from "@/types/queue";
 
@@ -7,6 +7,7 @@ type QueueListProps = {
   loading: boolean;
   syncing: boolean;
   onRemove: (id: string) => Promise<void>;
+  onAssign: (id: string) => Promise<void>;
 };
 
 export function QueueList({
@@ -14,6 +15,7 @@ export function QueueList({
   loading,
   syncing,
   onRemove,
+  onAssign,
 }: QueueListProps) {
   if (loading) {
     return (
@@ -77,6 +79,19 @@ export function QueueList({
               {record.turno_desejado}
             </span>
             <p className="mt-4 text-xs uppercase tracking-[0.22em] text-slate-500">
+              Status
+            </p>
+            {record.status === "atribuido" ? (
+              <span className="mt-2 inline-flex items-center gap-2 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-sm font-medium text-emerald-100">
+                <CheckCircle2 className="h-4 w-4" />
+                Atribuido: {record.analista ?? "-"}
+              </span>
+            ) : (
+              <span className="mt-2 inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm font-medium text-slate-200">
+                Na fila
+              </span>
+            )}
+            <p className="mt-4 text-xs uppercase tracking-[0.22em] text-slate-500">
               Data da fila
             </p>
             <p className="mt-1 text-sm text-slate-200">{formatDate(record.data_fila)}</p>
@@ -87,15 +102,30 @@ export function QueueList({
           </div>
 
           <div className="flex items-center justify-start lg:justify-end">
-            <button
-              type="button"
-              disabled={syncing}
-              onClick={() => onRemove(record.id)}
-              className="inline-flex items-center gap-2 rounded-2xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm font-medium text-rose-100 transition hover:bg-rose-500/20 hover:shadow-[0_18px_60px_rgba(244,63,94,0.18)] disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <Trash2 className="h-4 w-4" />
-              Retirar da fila
-            </button>
+            {record.status === "atribuido" ? (
+              <span className="text-sm text-slate-400">Finalizado</span>
+            ) : (
+              <div className="flex flex-col gap-3 lg:items-end">
+                <button
+                  type="button"
+                  disabled={syncing}
+                  onClick={() => onAssign(record.id)}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#38bdf8]/30 bg-[#38bdf8]/15 px-4 py-3 text-sm font-semibold text-[#e0f2fe] transition hover:bg-[#38bdf8]/20 hover:shadow-[0_18px_60px_rgba(56,189,248,0.15)] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  Atribuir
+                </button>
+                <button
+                  type="button"
+                  disabled={syncing}
+                  onClick={() => onRemove(record.id)}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm font-medium text-rose-100 transition hover:bg-rose-500/20 hover:shadow-[0_18px_60px_rgba(244,63,94,0.18)] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Retirar
+                </button>
+              </div>
+            )}
           </div>
         </article>
       ))}

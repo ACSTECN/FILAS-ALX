@@ -231,7 +231,7 @@ export function AnalystRanking() {
             </div>
           </div>
 
-          <div className="alx-card rounded-[32px] border border-white/10 p-6 backdrop-blur">
+          <div className="alx-card relative overflow-hidden rounded-[36px] border border-white/10 p-6 backdrop-blur">
             <div className="mb-6 flex items-center justify-between">
               <div>
                 <p className="text-xs uppercase tracking-[0.28em] text-slate-500">
@@ -244,8 +244,12 @@ export function AnalystRanking() {
               <Crown className="h-6 w-6 text-[#f59e0b]" />
             </div>
 
+            <div className="absolute left-[-120px] top-[-120px] h-[340px] w-[340px] rounded-full bg-[#38bdf8]/15 blur-3xl" />
+            <div className="absolute right-[-120px] top-[40px] h-[360px] w-[360px] rounded-full bg-[#f97316]/12 blur-3xl" />
+            <div className="absolute bottom-[-140px] left-[20%] h-[420px] w-[420px] rounded-full bg-[#a78bfa]/10 blur-3xl" />
+
             {loading ? (
-              <div className="flex min-h-[240px] items-center justify-center text-slate-300">
+              <div className="flex min-h-[420px] items-center justify-center text-slate-300">
                 Carregando ranking...
               </div>
             ) : top3.length === 0 ? (
@@ -256,67 +260,159 @@ export function AnalystRanking() {
                 </p>
               </div>
             ) : (
-              <div className="grid gap-5 md:grid-cols-3">
-                {[top3[1], top3[0], top3[2]].filter(Boolean).map((item, idx) => {
-                  const row = item as RankingRow;
-                  const rank = idx === 1 ? 1 : idx === 0 ? 2 : 3;
-                  const palette =
-                    rank === 1
-                      ? { a: "#f59e0b", b: "#fb7185" }
-                      : rank === 2
-                        ? { a: "#38bdf8", b: "#a78bfa" }
-                        : { a: "#f97316", b: "#22c55e" };
+              <div className="relative min-h-[420px]">
+                <div className="absolute inset-x-0 top-10 mx-auto h-[320px] w-[320px]">
+                  <div
+                    className="alx-rotate-slow absolute inset-0 rounded-full opacity-70"
+                    style={{
+                      background:
+                        "conic-gradient(from 90deg, rgba(56,189,248,0.0), rgba(56,189,248,0.55), rgba(249,115,22,0.55), rgba(56,189,248,0.0))",
+                      filter: "blur(0px)",
+                    }}
+                  />
+                  <div className="alx-pulse absolute inset-8 rounded-full border border-white/10 bg-white/5" />
+                  <div className="absolute inset-12 rounded-full border border-white/10 bg-[#020617]/40 backdrop-blur" />
+                </div>
 
-                  const bg = {
-                    backgroundImage: `radial-gradient(circle at 30% 20%, ${palette.a}33, transparent 55%), radial-gradient(circle at 75% 80%, ${palette.b}2b, transparent 55%), linear-gradient(180deg, rgba(7,17,31,0.92), rgba(2,6,23,0.92))`,
-                  } as const;
+                {(() => {
+                  const first = top3[0] as RankingRow;
+                  const second = top3[1] as RankingRow | undefined;
+                  const third = top3[2] as RankingRow | undefined;
 
-                  const avatar = colorFromName(row.analista);
+                  const firstAvatar = colorFromName(first.analista);
+                  const secondAvatar = second ? colorFromName(second.analista) : null;
+                  const thirdAvatar = third ? colorFromName(third.analista) : null;
 
                   return (
-                    <div
-                      key={row.analista}
-                      style={bg}
-                      className={[
-                        "rounded-[30px] border border-white/10 p-6 shadow-[0_22px_90px_rgba(2,6,23,0.42)]",
-                        rank === 1 ? "md:-translate-y-3" : "",
-                      ].join(" ")}
-                    >
-                      <div className="flex items-start justify-between">
-                        <span className="inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-white">
-                          #{rank}
-                        </span>
-                        {rank === 1 ? (
-                          <Crown className="h-5 w-5 text-[#f59e0b]" />
-                        ) : (
-                          <span className="text-xs uppercase tracking-[0.22em] text-slate-400">
-                            Top
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="mt-6 flex items-center gap-4">
+                    <div className="relative z-10 mx-auto flex max-w-4xl items-end justify-center gap-6 pt-6">
+                      {second ? (
                         <div
-                          className="grid h-16 w-16 place-items-center rounded-full border border-white/10 text-lg font-bold text-white shadow-[0_18px_70px_rgba(0,0,0,0.35)]"
+                          className="alx-float-slow w-[260px] rounded-[34px] border border-white/10 bg-white/5 p-6 shadow-[0_30px_120px_rgba(2,6,23,0.55)]"
                           style={{
-                            backgroundImage: `linear-gradient(135deg, ${avatar.a}, ${avatar.b})`,
+                            backgroundImage:
+                              "radial-gradient(circle at 30% 10%, rgba(56,189,248,0.28), transparent 55%), linear-gradient(180deg, rgba(7,17,31,0.92), rgba(2,6,23,0.92))",
+                            transform: "perspective(1000px) rotateY(10deg)",
+                            animationDelay: "0.6s",
                           }}
                         >
-                          {initials(row.analista)}
+                          <div className="flex items-start justify-between">
+                            <span className="inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-white">
+                              #2
+                            </span>
+                            <span className="text-xs uppercase tracking-[0.22em] text-slate-400">
+                              Prata
+                            </span>
+                          </div>
+
+                          <div className="mt-6 flex items-center gap-4">
+                            <div
+                              className="grid h-16 w-16 place-items-center rounded-full border border-white/10 text-lg font-bold text-white shadow-[0_18px_70px_rgba(0,0,0,0.35)]"
+                              style={{
+                                backgroundImage: secondAvatar
+                                  ? `linear-gradient(135deg, ${secondAvatar.a}, ${secondAvatar.b})`
+                                  : "linear-gradient(135deg, #38bdf8, #a78bfa)",
+                              }}
+                            >
+                              {initials(second.analista)}
+                            </div>
+                            <div>
+                              <p className="text-lg font-semibold text-white">{second.analista}</p>
+                              <p className="mt-1 text-sm text-slate-400">Analista</p>
+                            </div>
+                          </div>
+
+                          <div className="mt-6">
+                            <p className="text-3xl font-semibold text-white">{second.total}</p>
+                            <p className="mt-1 text-sm text-slate-400">Atribuicoes</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-lg font-semibold text-white">{row.analista}</p>
-                          <p className="mt-1 text-sm text-slate-400">Analista</p>
+                      ) : (
+                        <div className="hidden w-[260px] xl:block" />
+                      )}
+
+                      <div
+                        className="alx-float w-[300px] rounded-[38px] border border-white/10 bg-white/5 p-7 shadow-[0_40px_160px_rgba(2,6,23,0.62)]"
+                        style={{
+                          backgroundImage:
+                            "radial-gradient(circle at 50% 10%, rgba(245,158,11,0.33), transparent 60%), radial-gradient(circle at 70% 90%, rgba(249,115,22,0.22), transparent 58%), linear-gradient(180deg, rgba(7,17,31,0.94), rgba(2,6,23,0.92))",
+                        }}
+                      >
+                        <div className="flex items-start justify-between">
+                          <span className="inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-white">
+                            #1
+                          </span>
+                          <Crown className="h-5 w-5 text-[#f59e0b]" />
+                        </div>
+
+                        <div className="mt-7 flex items-center gap-4">
+                          <div
+                            className="relative grid h-20 w-20 place-items-center rounded-full border border-white/10 text-xl font-bold text-white shadow-[0_22px_90px_rgba(0,0,0,0.42)]"
+                            style={{
+                              backgroundImage: `linear-gradient(135deg, ${firstAvatar.a}, ${firstAvatar.b})`,
+                            }}
+                          >
+                            <div className="alx-pulse absolute -inset-2 rounded-full border border-[#f59e0b]/25" />
+                            <span className="relative z-10">{initials(first.analista)}</span>
+                          </div>
+                          <div>
+                            <p className="text-xl font-semibold text-white">{first.analista}</p>
+                            <p className="mt-1 text-sm text-slate-400">Analista</p>
+                          </div>
+                        </div>
+
+                        <div className="mt-7">
+                          <p className="text-4xl font-semibold text-white">{first.total}</p>
+                          <p className="mt-1 text-sm text-slate-400">Atribuicoes</p>
                         </div>
                       </div>
 
-                      <div className="mt-6">
-                        <p className="text-3xl font-semibold text-white">{row.total}</p>
-                        <p className="mt-1 text-sm text-slate-400">Atribuicoes</p>
-                      </div>
+                      {third ? (
+                        <div
+                          className="alx-float-slow w-[260px] rounded-[34px] border border-white/10 bg-white/5 p-6 shadow-[0_30px_120px_rgba(2,6,23,0.55)]"
+                          style={{
+                            backgroundImage:
+                              "radial-gradient(circle at 30% 10%, rgba(249,115,22,0.26), transparent 55%), linear-gradient(180deg, rgba(7,17,31,0.92), rgba(2,6,23,0.92))",
+                            transform: "perspective(1000px) rotateY(-10deg)",
+                            animationDelay: "1.1s",
+                          }}
+                        >
+                          <div className="flex items-start justify-between">
+                            <span className="inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-white">
+                              #3
+                            </span>
+                            <span className="text-xs uppercase tracking-[0.22em] text-slate-400">
+                              Bronze
+                            </span>
+                          </div>
+
+                          <div className="mt-6 flex items-center gap-4">
+                            <div
+                              className="grid h-16 w-16 place-items-center rounded-full border border-white/10 text-lg font-bold text-white shadow-[0_18px_70px_rgba(0,0,0,0.35)]"
+                              style={{
+                                backgroundImage: thirdAvatar
+                                  ? `linear-gradient(135deg, ${thirdAvatar.a}, ${thirdAvatar.b})`
+                                  : "linear-gradient(135deg, #f97316, #22c55e)",
+                              }}
+                            >
+                              {initials(third.analista)}
+                            </div>
+                            <div>
+                              <p className="text-lg font-semibold text-white">{third.analista}</p>
+                              <p className="mt-1 text-sm text-slate-400">Analista</p>
+                            </div>
+                          </div>
+
+                          <div className="mt-6">
+                            <p className="text-3xl font-semibold text-white">{third.total}</p>
+                            <p className="mt-1 text-sm text-slate-400">Atribuicoes</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="hidden w-[260px] xl:block" />
+                      )}
                     </div>
                   );
-                })}
+                })()}
               </div>
             )}
           </div>

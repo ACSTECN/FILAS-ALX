@@ -107,6 +107,22 @@
       radial-gradient(circle at top right, rgba(37, 99, 235, 0.14), transparent 38%),
       linear-gradient(180deg, rgba(7, 17, 31, 0.92), rgba(2, 6, 23, 0.92));
   }
+
+  .alx-float {
+    animation: alx-float 5.5s ease-in-out infinite;
+  }
+
+  .alx-float-slow {
+    animation: alx-float 8.5s ease-in-out infinite;
+  }
+
+  .alx-rotate-slow {
+    animation: alx-spin 22s linear infinite;
+  }
+
+  .alx-pulse {
+    animation: alx-pulse 3.6s ease-in-out infinite;
+  }
 }
 
 @keyframes alx-spin {
@@ -115,5 +131,25 @@
   }
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes alx-float {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes alx-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.9;
   }
 }

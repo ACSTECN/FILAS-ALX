@@ -84,7 +84,7 @@ export function QueueList({
             {record.status === "atribuido" ? (
               <span className="mt-2 inline-flex items-center gap-2 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-sm font-medium text-emerald-100">
                 <CheckCircle2 className="h-4 w-4" />
-                Atribuido: {record.analista ?? "-"}
+                Registrado por: {record.analista ?? "-"}
               </span>
             ) : (
               <span className="mt-2 inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm font-medium text-slate-200">

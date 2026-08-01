@@ -57,7 +57,7 @@ export default function Home() {
   };
 
   const handleAssign = async (id: string) => {
-    await assignRecord(id, analystName);
+    await assignRecord(id);
   };
 
   return (
@@ -228,7 +228,7 @@ export default function Home() {
                   className="alx-field mt-5 w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-[#38bdf8]/60"
                 />
                 <p className="mt-3 text-sm text-slate-400">
-                  Esse nome vai aparecer quando voce atribuir um entregador.
+                  Esse nome marca quem colocou o entregador na fila (e conta no ranking quando for atribuido).
                 </p>
               </div>
               <QueueForm

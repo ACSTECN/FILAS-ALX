@@ -25,7 +25,7 @@ type QueueStore = {
   loadQueue: () => Promise<void>;
   createRecord: (values: QueueFormValues) => Promise<void>;
   removeRecord: (id: string) => Promise<void>;
-  assignRecord: (id: string, analystName: string) => Promise<void>;
+  assignRecord: (id: string) => Promise<void>;
   replaceQueue: (records: QueueRecord[]) => void;
 };
 
@@ -138,11 +138,13 @@ export const useQueueStore = create<QueueStore>((set) => ({
   createRecord: async (values) => {
     set({ syncing: true, error: null });
 
+    const analystName = useQueueStore.getState().analystName.trim();
+
     if (supabase) {
       const { error } = await supabase.from("fila_registros").insert({
         ...values,
         status: "na_fila",
-        analista: null,
+        analista: analystName ? analystName : null,
       } as never);
 
       if (error) {
@@ -167,7 +169,7 @@ export const useQueueStore = create<QueueStore>((set) => ({
       id: crypto.randomUUID(),
       ...values,
       status: "na_fila",
-      analista: null,
+      analista: analystName ? analystName : null,
       criado_em: new Date().toISOString(),
     };
     const nextQueue = normalizeQueue([...useQueueStore.getState().queue, nextRecord]);
@@ -221,19 +223,13 @@ export const useQueueStore = create<QueueStore>((set) => ({
     writeLocalQueue(nextQueue);
     set({ queue: nextQueue, syncing: false });
   },
-  assignRecord: async (id, analystName) => {
+  assignRecord: async (id) => {
     set({ syncing: true, error: null });
-
-    const trimmed = analystName.trim();
-    if (!trimmed) {
-      set({ syncing: false, error: "Informe o nome do analista para atribuir." });
-      return;
-    }
 
     if (supabase) {
       const { error } = await supabase
         .from("fila_registros")
-        .update({ status: "atribuido", analista: trimmed } as never)
+        .update({ status: "atribuido" } as never)
         .eq("id", id);
 
       if (error) {
@@ -260,7 +256,6 @@ export const useQueueStore = create<QueueStore>((set) => ({
           ? {
               ...record,
               status: "atribuido",
-              analista: trimmed,
             }
           : record,
       ),

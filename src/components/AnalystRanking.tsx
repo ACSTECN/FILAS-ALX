@@ -164,10 +164,10 @@ export function AnalystRanking() {
               Ranking
             </p>
             <h2 className="mt-2 text-2xl font-semibold text-white">
-              Analistas com mais atribuicoes
+              Analistas com mais entregadores atribuidos
             </h2>
             <p className="mt-2 text-sm text-slate-400">
-              Conta quantos entregadores foram marcados como atribuidos.
+              Conta por analista que registrou a entrada na fila.
             </p>
           </div>
 

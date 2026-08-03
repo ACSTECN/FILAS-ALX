@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Crown, Sparkles, UsersRound } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import type { City } from "@/types/queue";
 
 type RankingRow = {
   analista: string;
@@ -68,6 +69,7 @@ function getMonthRange(year: string, month: string) {
 }
 
 export function AnalystRanking() {
+  const [city, setCity] = useState<City | "Todas">("Todas");
   const [month, setMonth] = useState(() => new Date().toLocaleDateString("en-CA").slice(5, 7));
   const [year, setYear] = useState(() => String(new Date().getFullYear()));
   const [loading, setLoading] = useState(true);
@@ -89,9 +91,13 @@ export function AnalystRanking() {
 
     let query = supabase
       .from("fila_registros")
-      .select("analista,data_fila")
+      .select("analista,data_fila,cidade")
       .eq("status", "atribuido")
       .not("analista", "is", null);
+
+    if (city !== "Todas") {
+      query = query.eq("cidade", city);
+    }
 
     if (range) {
       query = query.gte("data_fila", range.start).lt("data_fila", range.end);
@@ -124,7 +130,7 @@ export function AnalystRanking() {
 
   useEffect(() => {
     void loadRanking();
-  }, [month, year]);
+  }, [city, month, year]);
 
   useEffect(() => {
     if (!supabase) {
@@ -145,7 +151,7 @@ export function AnalystRanking() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [month, year]);
+  }, [city, month, year]);
 
   const totalAtribuidos = useMemo(
     () => rows.reduce((sum, row) => sum + row.total, 0),
@@ -171,7 +177,22 @@ export function AnalystRanking() {
             </p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <select
+              value={city}
+              onChange={(event) => setCity(event.target.value as City | "Todas")}
+              className="alx-field rounded-2xl border border-white/10 px-4 py-3 text-sm text-white outline-none"
+            >
+              <option value="Todas" className="bg-slate-950 text-white">
+                Todas
+              </option>
+              <option value="Rio de Janeiro" className="bg-slate-950 text-white">
+                Rio de Janeiro
+              </option>
+              <option value="São Paulo" className="bg-slate-950 text-white">
+                São Paulo
+              </option>
+            </select>
             <select
               value={month}
               onChange={(event) => setMonth(event.target.value)}

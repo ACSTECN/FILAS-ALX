@@ -17,6 +17,17 @@ export function QueueList({
   onRemove,
   onAssign,
 }: QueueListProps) {
+  const statusLabel = (status: QueueRecord["status"]) => {
+    const kind = status.endsWith("_tpr") ? "TPR" : "FILA";
+    if (status.startsWith("atribuido")) {
+      return `Atribuido ${kind}`;
+    }
+    if (status.startsWith("retirado")) {
+      return `Retirado ${kind}`;
+    }
+    return `Na fila ${kind}`;
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-[220px] items-center justify-center rounded-[32px] border border-white/10 bg-white/5">
@@ -81,14 +92,14 @@ export function QueueList({
             <p className="mt-4 text-xs uppercase tracking-[0.22em] text-slate-500">
               Status
             </p>
-            {record.status === "atribuido" ? (
+            {record.status.startsWith("atribuido") ? (
               <span className="mt-2 inline-flex items-center gap-2 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-sm font-medium text-emerald-100">
                 <CheckCircle2 className="h-4 w-4" />
-                Registrado por: {record.analista ?? "-"}
+                {statusLabel(record.status)} · Registrado por: {record.analista ?? "-"}
               </span>
             ) : (
               <span className="mt-2 inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm font-medium text-slate-200">
-                Na fila
+                {statusLabel(record.status)}
               </span>
             )}
             <p className="mt-4 text-xs uppercase tracking-[0.22em] text-slate-500">
@@ -102,7 +113,7 @@ export function QueueList({
           </div>
 
           <div className="flex items-center justify-start lg:justify-end">
-            {record.status === "atribuido" ? (
+            {record.status.startsWith("atribuido") ? (
               <span className="text-sm text-slate-400">Finalizado</span>
             ) : (
               <div className="flex flex-col gap-3 lg:items-end">

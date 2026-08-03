@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Crown, Sparkles, UsersRound } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import type { City } from "@/types/queue";
+import type { AssignmentKind, City } from "@/types/queue";
 
 type RankingRow = {
   analista: string;
@@ -70,6 +70,7 @@ function getMonthRange(year: string, month: string) {
 
 export function AnalystRanking() {
   const [city, setCity] = useState<City | "Todas">("Todas");
+  const [kind, setKind] = useState<AssignmentKind | "Todas">("Todas");
   const [month, setMonth] = useState(() => new Date().toLocaleDateString("en-CA").slice(5, 7));
   const [year, setYear] = useState(() => String(new Date().getFullYear()));
   const [loading, setLoading] = useState(true);
@@ -89,10 +90,17 @@ export function AnalystRanking() {
 
     const range = getMonthRange(year, month);
 
+    const status =
+      kind === "FILA"
+        ? ["atribuido_fila", "atribuido"]
+        : kind === "TPR"
+          ? ["atribuido_tpr"]
+          : ["atribuido_fila", "atribuido_tpr", "atribuido"];
+
     let query = supabase
       .from("fila_registros")
       .select("analista,data_fila,cidade")
-      .eq("status", "atribuido")
+      .in("status", status)
       .not("analista", "is", null);
 
     if (city !== "Todas") {
@@ -130,7 +138,7 @@ export function AnalystRanking() {
 
   useEffect(() => {
     void loadRanking();
-  }, [city, month, year]);
+  }, [city, kind, month, year]);
 
   useEffect(() => {
     if (!supabase) {
@@ -151,7 +159,7 @@ export function AnalystRanking() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [city, month, year]);
+  }, [city, kind, month, year]);
 
   const totalAtribuidos = useMemo(
     () => rows.reduce((sum, row) => sum + row.total, 0),
@@ -177,7 +185,7 @@ export function AnalystRanking() {
             </p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <select
               value={city}
               onChange={(event) => setCity(event.target.value as City | "Todas")}
@@ -191,6 +199,21 @@ export function AnalystRanking() {
               </option>
               <option value="São Paulo" className="bg-slate-950 text-white">
                 São Paulo
+              </option>
+            </select>
+            <select
+              value={kind}
+              onChange={(event) => setKind(event.target.value as AssignmentKind | "Todas")}
+              className="alx-field rounded-2xl border border-white/10 px-4 py-3 text-sm text-white outline-none"
+            >
+              <option value="Todas" className="bg-slate-950 text-white">
+                Todos os tipos
+              </option>
+              <option value="FILA" className="bg-slate-950 text-white">
+                Fila
+              </option>
+              <option value="TPR" className="bg-slate-950 text-white">
+                TPR
               </option>
             </select>
             <select

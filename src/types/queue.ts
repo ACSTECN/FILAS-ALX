@@ -1,6 +1,6 @@
 export type City = "Rio de Janeiro" | "São Paulo";
 
-export type Shift = "Manhã" | "Tarde" | "Noite" | "Madrugada" | "Flexível";
+export type Shift = "Manhã" | "Tarde" | "Noite" | "Ceia" | "Flexível";
 
 export type Hotzone =
   | "Bangu"
@@ -12,7 +12,15 @@ export type Hotzone =
   | "Paulista"
   | "Santo Amaro";
 
-export type QueueStatus = "na_fila" | "atribuido" | "retirado";
+export type AssignmentKind = "FILA" | "TPR";
+
+export type QueueStatus =
+  | "na_fila_fila"
+  | "na_fila_tpr"
+  | "atribuido_fila"
+  | "atribuido_tpr"
+  | "retirado_fila"
+  | "retirado_tpr";
 
 export type QueueRecord = {
   id: string;
@@ -32,6 +40,7 @@ export type QueueFormValues = {
   nome: string;
   cidade: City;
   hotzone: Hotzone;
+  tipo_atribuicao: AssignmentKind;
   turno_desejado: Shift;
   data_fila: string;
   status?: QueueStatus;

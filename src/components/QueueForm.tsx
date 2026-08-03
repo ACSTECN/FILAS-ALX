@@ -1,7 +1,7 @@
 import { FormEvent, useMemo, useState } from "react";
 import { ArrowRight, LoaderCircle } from "lucide-react";
 import { hotzonesByCity, shiftOptions } from "@/data/hotzones";
-import type { City, Hotzone, QueueFormValues, Shift } from "@/types/queue";
+import type { AssignmentKind, City, Hotzone, QueueFormValues, Shift } from "@/types/queue";
 
 type QueueFormProps = {
   activeCity: City;
@@ -20,6 +20,7 @@ export function QueueForm({
 }: QueueFormProps) {
   const [codigo, setCodigo] = useState("");
   const [nome, setNome] = useState("");
+  const [tipo, setTipo] = useState<AssignmentKind>("FILA");
   const [turno, setTurno] = useState<Shift>("Flexível");
   const [dataFila, setDataFila] = useState(() => new Date().toISOString().slice(0, 10));
   const [formError, setFormError] = useState<string | null>(null);
@@ -44,12 +45,14 @@ export function QueueForm({
       nome: nome.trim(),
       cidade: activeCity,
       hotzone: selectedHotzone,
+      tipo_atribuicao: tipo,
       turno_desejado: turno,
       data_fila: dataFila,
     });
 
     setCodigo("");
     setNome("");
+    setTipo("FILA");
     setTurno("Flexível");
     setDataFila(new Date().toISOString().slice(0, 10));
   };
@@ -115,6 +118,22 @@ export function QueueForm({
                 {hotzone}
               </option>
             ))}
+          </select>
+        </label>
+
+        <label className="space-y-2 text-sm text-slate-300 md:col-span-2">
+          <span>Tipo de atribuicao</span>
+          <select
+            value={tipo}
+            onChange={(event) => setTipo(event.target.value as AssignmentKind)}
+            className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none transition focus:border-[#2563eb]/60"
+          >
+            <option value="FILA" className="bg-slate-950 text-white">
+              Fila
+            </option>
+            <option value="TPR" className="bg-slate-950 text-white">
+              TPR
+            </option>
           </select>
         </label>
 

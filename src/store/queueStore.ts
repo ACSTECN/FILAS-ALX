@@ -67,16 +67,54 @@ function writeLocalQueue(records: QueueRecord[]) {
   }
 }
 
+function normalizeStatus(
+  status: QueueRecord["status"] | string | null | undefined,
+): QueueRecord["status"] {
+  if (status === "na_fila") {
+    return "na_fila_fila";
+  }
+
+  if (status === "atribuido") {
+    return "atribuido_fila";
+  }
+
+  if (status === "retirado") {
+    return "retirado_fila";
+  }
+
+  if (
+    status === "na_fila_fila" ||
+    status === "na_fila_tpr" ||
+    status === "atribuido_fila" ||
+    status === "atribuido_tpr" ||
+    status === "retirado_fila" ||
+    status === "retirado_tpr"
+  ) {
+    return status;
+  }
+
+  return "na_fila_fila";
+}
+
+function isQueueStatus(status: QueueRecord["status"] | string | null | undefined) {
+  const normalized = normalizeStatus(status);
+  return normalized === "na_fila_fila" || normalized === "na_fila_tpr";
+}
+
+function isTprStatus(status: QueueRecord["status"] | string | null | undefined) {
+  return normalizeStatus(status).endsWith("_tpr");
+}
+
 function normalizeQueue(records: QueueRecord[]) {
   return [...records]
     .map((record) => ({
       ...record,
       data_fila: record.data_fila ?? record.criado_em.slice(0, 10),
-      status: record.status ?? "na_fila",
+      status: normalizeStatus(record.status),
       analista: record.analista ?? null,
     }))
     .filter((record) => !isExpiredQueueDate(record.data_fila))
-    .filter((record) => record.status === "na_fila")
+    .filter((record) => isQueueStatus(record.status))
     .sort((a, b) => a.criado_em.localeCompare(b.criado_em));
 }
 
@@ -106,7 +144,7 @@ export const useQueueStore = create<QueueStore>((set) => ({
         .from("fila_registros")
         .select("*")
         .gte("data_fila", todayKey)
-        .eq("status", "na_fila")
+        .in("status", ["na_fila_fila", "na_fila_tpr", "na_fila"])
         .order("criado_em", { ascending: true });
 
       if (error) {
@@ -139,11 +177,13 @@ export const useQueueStore = create<QueueStore>((set) => ({
     set({ syncing: true, error: null });
 
     const analystName = useQueueStore.getState().analystName.trim();
+    const { tipo_atribuicao, ...payload } = values;
+    const status = tipo_atribuicao === "TPR" ? "na_fila_tpr" : "na_fila_fila";
 
     if (supabase) {
       const { error } = await supabase.from("fila_registros").insert({
-        ...values,
-        status: "na_fila",
+        ...payload,
+        status,
         analista: analystName ? analystName : null,
       } as never);
 
@@ -167,8 +207,8 @@ export const useQueueStore = create<QueueStore>((set) => ({
 
     const nextRecord: QueueRecord = {
       id: crypto.randomUUID(),
-      ...values,
-      status: "na_fila",
+      ...payload,
+      status,
       analista: analystName ? analystName : null,
       criado_em: new Date().toISOString(),
     };
@@ -181,11 +221,13 @@ export const useQueueStore = create<QueueStore>((set) => ({
     set({ syncing: true, error: null });
 
     if (supabase) {
+      const current = useQueueStore.getState().queue.find((record) => record.id === id);
+      const status = isTprStatus(current?.status) ? "retirado_tpr" : "retirado_fila";
       const analystName = useQueueStore.getState().analystName.trim();
       const { error } = await supabase
         .from("fila_registros")
         .update({
-          status: "retirado",
+          status,
           analista: analystName ? analystName : null,
         } as never)
         .eq("id", id);
@@ -208,13 +250,15 @@ export const useQueueStore = create<QueueStore>((set) => ({
       return;
     }
 
+    const current = useQueueStore.getState().queue.find((record) => record.id === id);
+    const status = isTprStatus(current?.status) ? "retirado_tpr" : "retirado_fila";
     const analystName = useQueueStore.getState().analystName.trim();
     const nextQueue = normalizeQueue(
       useQueueStore.getState().queue.map((record) =>
         record.id === id
           ? {
               ...record,
-              status: "retirado",
+              status,
               analista: analystName ? analystName : null,
             }
           : record,
@@ -227,9 +271,11 @@ export const useQueueStore = create<QueueStore>((set) => ({
     set({ syncing: true, error: null });
 
     if (supabase) {
+      const current = useQueueStore.getState().queue.find((record) => record.id === id);
+      const status = isTprStatus(current?.status) ? "atribuido_tpr" : "atribuido_fila";
       const { error } = await supabase
         .from("fila_registros")
-        .update({ status: "atribuido" } as never)
+        .update({ status } as never)
         .eq("id", id);
 
       if (error) {
@@ -250,12 +296,14 @@ export const useQueueStore = create<QueueStore>((set) => ({
       return;
     }
 
+    const current = useQueueStore.getState().queue.find((record) => record.id === id);
+    const status = isTprStatus(current?.status) ? "atribuido_tpr" : "atribuido_fila";
     const nextQueue = normalizeQueue(
       useQueueStore.getState().queue.map((record) =>
         record.id === id
           ? {
               ...record,
-              status: "atribuido",
+              status,
             }
           : record,
       ),

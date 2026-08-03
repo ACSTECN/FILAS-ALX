@@ -11,7 +11,7 @@ export const shiftOptions: Shift[] = [
   "Manhã",
   "Tarde",
   "Noite",
-  "Madrugada",
+  "Ceia",
   "Flexível",
 ];
 

@@ -2,7 +2,7 @@ import type { RecordSource, UnifiedItemKind } from "./unified";
 
 export type City = "Rio de Janeiro" | "São Paulo";
 
-export type Shift = "Manhã" | "Tarde" | "Noite" | "Ceia" | "Flexível";
+export type Shift = "Manhã" | "Tarde" | "Noite" | "Ceia";
 
 export type Hotzone =
   | "Bangu"

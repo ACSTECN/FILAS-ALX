@@ -23,7 +23,7 @@ export function QueueForm({
   const [cpf, setCpf] = useState("");
   const [nome, setNome] = useState("");
   const [tipo, setTipo] = useState<AssignmentKind>("FILA");
-  const [turno, setTurno] = useState<Shift>("Flexível");
+  const [turno, setTurno] = useState<Shift>("Manhã");
   const [dataFila, setDataFila] = useState(() => new Date().toISOString().slice(0, 10));
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -58,7 +58,7 @@ export function QueueForm({
     setCpf("");
     setNome("");
     setTipo("FILA");
-    setTurno("Flexível");
+    setTurno("Manhã");
     setDataFila(new Date().toISOString().slice(0, 10));
   };
 

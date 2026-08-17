@@ -12,7 +12,6 @@ export const shiftOptions: Shift[] = [
   "Tarde",
   "Noite",
   "Ceia",
-  "Flexível",
 ];
 
 export function getCityByHotzone(hotzone: Hotzone): City {

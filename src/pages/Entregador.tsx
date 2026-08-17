@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { CalendarCheck, LoaderCircle, ShieldCheck } from "lucide-react";
+import { AlertTriangle, CalendarCheck, LoaderCircle, ShieldCheck } from "lucide-react";
 import { hotzonesByCity, shiftOptions } from "@/data/hotzones";
 import { useQueueStore } from "@/store/queueStore";
 import type { City, Hotzone, QueueFormValues, Shift } from "@/types/queue";
@@ -29,10 +29,11 @@ export default function EntregadorPage() {
   const [cpfConfirmado, setCpfConfirmado] = useState<string | null>(null);
   const [cidade, setCidade] = useState<City>("Rio de Janeiro");
   const [hotzone, setHotzone] = useState<Hotzone>(hotzonesByCity["Rio de Janeiro"][0]);
-  const [turno, setTurno] = useState<Shift>("Flexível");
+  const [turno, setTurno] = useState<Shift>("Manhã");
   const [dataFila, setDataFila] = useState(() => new Date().toISOString().slice(0, 10));
   const [nome, setNome] = useState("");
   const [contato, setContato] = useState("");
+  const [confirmacaoOk, setConfirmacaoOk] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
 
@@ -85,6 +86,11 @@ export default function EntregadorPage() {
       return;
     }
 
+    if (!confirmacaoOk) {
+      setFormError("Confirme o aviso antes de cadastrar o interesse.");
+      return;
+    }
+
     const payload: QueueFormValues = {
       origem: "entregador",
       tipo: "ENTREGADOR",
@@ -107,6 +113,7 @@ export default function EntregadorPage() {
 
     setNome("");
     setContato("");
+    setConfirmacaoOk(false);
     setFormSuccess("Interesse de agenda registrado. A equipe ira acompanhar.");
     if (cpfConfirmado) {
       await loadEntregadorQueue(cpfConfirmado);
@@ -245,6 +252,37 @@ export default function EntregadorPage() {
                     className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-[#f97316]/60"
                   />
                 </label>
+              </div>
+
+              <div className="mt-6 rounded-[28px] border border-[#f59e0b]/25 bg-gradient-to-br from-[#f59e0b]/10 via-[#f97316]/10 to-transparent p-5">
+                <div className="flex items-start gap-4">
+                  <div className="grid h-10 w-10 flex-none place-items-center rounded-2xl bg-[#f59e0b]/20 text-[#f59e0b]">
+                    <AlertTriangle className="h-5 w-5" />
+                  </div>
+                  <div className="space-y-3 text-sm leading-7">
+                    <p className="font-semibold text-[#fde68a]">
+                      Atenção: precisamos de certeza sobre o seu interesse.
+                    </p>
+                    <p className="text-slate-200">
+                      Ao cadastrar este interesse de agenda, você confirma que está de
+                      acordo com a data e o turno informados. Caso surja uma oportunidade
+                      na sua hotzone, a nossa equipe entrará em contato com você para
+                      confirmar e seguir com o atendimento.
+                    </p>
+                    <label className="flex items-start gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-slate-200">
+                      <input
+                        type="checkbox"
+                        checked={confirmacaoOk}
+                        onChange={(event) => setConfirmacaoOk(event.target.checked)}
+                        className="mt-0.5 h-4 w-4 rounded border-white/20 bg-white/10 text-[#f97316] focus:ring-[#f97316]"
+                      />
+                      <span>
+                        Tenho certeza do interesse informado e autorizo a equipe ALX a
+                        entrar em contato caso haja oportunidade nesta data.
+                      </span>
+                    </label>
+                  </div>
+                </div>
               </div>
 
               {formError ? (

@@ -12,9 +12,13 @@ export function ProtectedRoute({ allowedRoles, children }: ProtectedRouteProps) 
   const location = useLocation();
   const user = useAuthStore((state) => state.user);
 
-  if (!roleMatches(user, allowedRoles)) {
-    return <Navigate to="/login" replace state={{ from: location }} />;
+  if (roleMatches(user, allowedRoles)) {
+    return <>{children}</>;
   }
 
-  return <>{children}</>;
+  if (user?.role === "entregador") {
+    return <Navigate to="/entregador" replace />;
+  }
+
+  return <Navigate to="/login" replace state={{ from: location }} />;
 }

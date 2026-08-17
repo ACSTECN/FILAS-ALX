@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { AlertTriangle, CalendarCheck, LoaderCircle, ShieldCheck } from "lucide-react";
 import { hotzonesByCity, shiftOptions } from "@/data/hotzones";
 import { useQueueStore } from "@/store/queueStore";
@@ -18,6 +19,8 @@ function tipoLabel(tipo: string) {
 }
 
 export default function EntregadorPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const queue = useQueueStore((state) => state.queue);
   const loading = useQueueStore((state) => state.loading);
   const syncing = useQueueStore((state) => state.syncing);
@@ -38,6 +41,12 @@ export default function EntregadorPage() {
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
 
   const cityHotzones = useMemo(() => hotzonesByCity[cidade], [cidade]);
+
+  useEffect(() => {
+    if (location.pathname !== "/entregador") {
+      navigate("/entregador", { replace: true });
+    }
+  }, [location.pathname, navigate]);
 
   useEffect(() => {
     if (cpfConfirmado) {
@@ -68,6 +77,7 @@ export default function EntregadorPage() {
     }
 
     setCpfConfirmado(digits);
+    navigate("/entregador", { replace: true });
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -326,6 +336,7 @@ export default function EntregadorPage() {
                 onClick={() => {
                   setCpfConfirmado(null);
                   setCpf("");
+                  navigate("/entregador", { replace: true });
                 }}
                 className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 px-5 py-3 text-sm text-slate-200 transition hover:border-white/20 hover:text-white"
               >
@@ -356,23 +367,40 @@ export default function EntregadorPage() {
                     pending.map((item) => (
                       <article
                         key={item.id}
-                        className="rounded-3xl border border-white/10 bg-white/[0.04] p-5"
+                        className="rounded-[24px] border border-white/10 bg-white/[0.04] p-5"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <div>
-                            <p className="text-sm font-semibold text-white">{item.nome}</p>
+                            <p className="text-sm font-semibold text-white uppercase tracking-wide">
+                              {item.nome}
+                            </p>
                             <p className="mt-1 text-xs text-slate-400">
-                              {item.cidade} · {item.hotzone} · {item.turno_desejado}
+                              {item.cidade} · {item.hotzone}
                             </p>
                           </div>
-                          <span className="inline-flex items-center gap-2 rounded-full border border-[#fb923c]/30 bg-[#fb923c]/10 px-3 py-1 text-xs text-[#fff7ed]">
-                            {statusLabel(item.status)}
+                          <span className="rounded-full border border-[#fb923c]/30 bg-[#fb923c]/10 px-3 py-1 text-xs text-[#fff7ed]">
+                            {tipoLabel(item.tipo)}
                           </span>
                         </div>
-                        <div className="mt-3 grid gap-3 text-xs text-slate-300 sm:grid-cols-3">
-                          <span>Data: {item.data_fila}</span>
-                          <span>Tipo: {tipoLabel(item.tipo)}</span>
-                          <span>CPF: {item.cpf ? formatCPF(item.cpf) : "-"}</span>
+                        <div className="mt-4 grid gap-3 text-sm text-slate-300 sm:grid-cols-3">
+                          <div>
+                            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                              Turno
+                            </p>
+                            <p className="mt-1 text-white">{item.turno_desejado}</p>
+                          </div>
+                          <div>
+                            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                              Data
+                            </p>
+                            <p className="mt-1 text-white">{item.data_fila}</p>
+                          </div>
+                          <div>
+                            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                              Status
+                            </p>
+                            <p className="mt-1 text-white">{statusLabel(item.status)}</p>
+                          </div>
                         </div>
                       </article>
                     ))
@@ -381,38 +409,42 @@ export default function EntregadorPage() {
               </div>
 
               <div className="alx-card rounded-[32px] border border-white/10 p-6 backdrop-blur">
-                <h3 className="text-xl font-semibold">Historico</h3>
-                <p className="mt-2 text-sm text-slate-300">
-                  Atribuidas ou retiradas pela operacao.
-                </p>
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <h3 className="text-xl font-semibold">Historico</h3>
+                    <p className="mt-2 text-sm text-slate-300">
+                      Interesses atribuidos ou concluidos.
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-[#38bdf8]/30 bg-[#38bdf8]/10 px-4 py-2 text-sm text-[#e0f2fe]">
+                    {concluidos.length} registros
+                  </span>
+                </div>
 
                 <div className="mt-5 space-y-4">
                   {concluidos.length === 0 ? (
                     <p className="rounded-2xl border border-white/10 bg-black/20 px-4 py-5 text-sm text-slate-400">
-                      Nao ha historico para este CPF ainda.
+                      Sem historico ainda.
                     </p>
                   ) : (
                     concluidos.map((item) => (
                       <article
                         key={item.id}
-                        className="rounded-3xl border border-white/10 bg-white/[0.04] p-5"
+                        className="rounded-[24px] border border-white/10 bg-white/[0.04] p-5"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-3">
-                          <p className="text-sm font-semibold text-white">{item.nome}</p>
-                          <span
-                            className={
-                              item.status.startsWith("atribuido_")
-                                ? "inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-100"
-                                : "inline-flex items-center gap-2 rounded-full border border-slate-400/30 bg-slate-400/10 px-3 py-1 text-xs text-slate-200"
-                            }
-                          >
+                          <div>
+                            <p className="text-sm font-semibold text-white uppercase tracking-wide">
+                              {item.nome}
+                            </p>
+                            <p className="mt-1 text-xs text-slate-400">
+                              {item.cidade} · {item.hotzone} · {item.turno_desejado}
+                            </p>
+                          </div>
+                          <span className="rounded-full border border-[#38bdf8]/30 bg-[#38bdf8]/10 px-3 py-1 text-xs text-[#e0f2fe]">
                             {statusLabel(item.status)}
                           </span>
                         </div>
-                        <p className="mt-3 text-xs text-slate-400">
-                          {item.cidade} · {item.hotzone} · {item.turno_desejado} ·{" "}
-                          {item.data_fila}
-                        </p>
                       </article>
                     ))
                   )}
@@ -421,50 +453,59 @@ export default function EntregadorPage() {
             </div>
           </section>
         ) : (
-          <section className="alx-card mt-8 rounded-[32px] border border-white/10 p-6 backdrop-blur sm:p-8">
-            <div className="grid gap-8 md:grid-cols-[1.05fr_0.95fr] md:items-center">
+          <section className="mt-8">
+            <form
+              onSubmit={handleIdentificar}
+              className="alx-card mx-auto w-full max-w-xl rounded-[32px] border border-white/10 p-6 shadow-[0_24px_90px_rgba(2,6,23,0.48)] backdrop-blur"
+            >
               <div>
-                <p className="text-xs uppercase tracking-[0.32em] text-[#fb923c]">
-                  Acesso rapido
+                <p className="text-xs uppercase tracking-[0.32em] text-[#f97316]">
+                  Identificacao
                 </p>
-                <h2 className="mt-4 text-3xl font-semibold leading-tight sm:text-4xl">
-                  Digite seu CPF para entrar no painel do entregador.
-                </h2>
-                <p className="mt-4 max-w-xl text-sm leading-7 text-slate-300">
-                  Essa tela é 100% voltada para entregadores. Com seu CPF você cadastra
-                  interesses de agenda e acompanha seu proprio historico.
+                <h3 className="mt-3 text-2xl font-semibold">
+                  Entre com o seu CPF
+                </h3>
+                <p className="mt-2 text-sm text-slate-300">
+                  Esta área é exclusiva para agendamento de interesses dos entregadores.
+                  Você só consegue visualizar e cadastrar interesses do próprio CPF.
                 </p>
               </div>
 
-              <form
-                onSubmit={handleIdentificar}
-                className="space-y-5 rounded-[28px] border border-white/10 bg-white/[0.04] p-6 backdrop-blur"
+              <label className="mt-6 block space-y-2 text-sm text-slate-300">
+                <span>CPF</span>
+                <input
+                  inputMode="numeric"
+                  value={cpf}
+                  onChange={(event) => setCpf(event.target.value)}
+                  placeholder="Digite seu CPF (apenas numeros)"
+                  className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-[#f97316]/60"
+                />
+              </label>
+
+              {formError ? (
+                <div className="mt-5 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+                  {formError}
+                </div>
+              ) : null}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#f97316] via-[#fb923c] to-[#f97316] px-5 py-4 text-sm font-semibold text-slate-950 shadow-[0_20px_60px_rgba(249,115,22,0.3)] transition hover:-translate-y-0.5 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
               >
-                <label className="block space-y-2 text-sm text-slate-300">
-                  <span>CPF</span>
-                  <input
-                    value={cpf}
-                    onChange={(event) => setCpf(formatCPF(normalizeCPF(event.target.value)))}
-                    placeholder="Digite seu CPF"
-                    className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-[#fb923c]/60"
-                  />
-                </label>
-
-                {formError ? (
-                  <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
-                    {formError}
-                  </div>
-                ) : null}
-
-                <button
-                  type="submit"
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#f97316] via-[#fb923c] to-[#f97316] px-5 py-4 text-sm font-semibold text-slate-950 shadow-[0_20px_60px_rgba(249,115,22,0.3)] transition hover:-translate-y-0.5 hover:brightness-110"
-                >
-                  Continuar
-                  <CalendarCheck className="h-4 w-4" />
-                </button>
-              </form>
-            </div>
+                {loading ? (
+                  <>
+                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                    Carregando
+                  </>
+                ) : (
+                  <>
+                    Continuar
+                    <ShieldCheck className="h-4 w-4" />
+                  </>
+                )}
+              </button>
+            </form>
           </section>
         )}
       </div>

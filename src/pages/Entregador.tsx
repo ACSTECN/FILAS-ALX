@@ -39,6 +39,7 @@ export default function EntregadorPage() {
   const [confirmacaoOk, setConfirmacaoOk] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
+  const [cpfLoading, setCpfLoading] = useState(false);
 
   const cityHotzones = useMemo(() => hotzonesByCity[cidade], [cidade]);
 
@@ -65,19 +66,25 @@ export default function EntregadorPage() {
   const pending = registros.filter((item) => item.status.startsWith("na_fila_"));
   const concluidos = registros.filter((item) => !item.status.startsWith("na_fila_"));
 
-  const handleIdentificar = (event: FormEvent<HTMLFormElement>) => {
+  const handleIdentificar = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFormError(null);
     setFormSuccess(null);
+    setCpfLoading(true);
 
-    const digits = normalizeCPF(cpf);
-    if (!isValidCPF(digits)) {
-      setFormError("Informe um CPF valido para continuar.");
-      return;
+    try {
+      const digits = normalizeCPF(cpf);
+      if (!isValidCPF(digits)) {
+        setFormError("Informe um CPF valido para continuar.");
+        return;
+      }
+
+      setCpfConfirmado(digits);
+      await loadEntregadorQueue(digits);
+      navigate("/entregador", { replace: true });
+    } finally {
+      setCpfLoading(false);
     }
-
-    setCpfConfirmado(digits);
-    navigate("/entregador", { replace: true });
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -490,10 +497,10 @@ export default function EntregadorPage() {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={cpfLoading}
                 className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#f97316] via-[#fb923c] to-[#f97316] px-5 py-4 text-sm font-semibold text-slate-950 shadow-[0_20px_60px_rgba(249,115,22,0.3)] transition hover:-translate-y-0.5 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
               >
-                {loading ? (
+                {cpfLoading ? (
                   <>
                     <LoaderCircle className="h-4 w-4 animate-spin" />
                     Carregando

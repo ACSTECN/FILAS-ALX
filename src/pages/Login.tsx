@@ -2,9 +2,6 @@ import { FormEvent, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { RadioTower, LogIn } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
-import { formatCPF, normalizeCPF } from "@/types/auth";
-
-type LoginMode = "operacional" | "entregador";
 
 export default function Login() {
   const location = useLocation();
@@ -12,11 +9,8 @@ export default function Login() {
   const user = useAuthStore((state) => state.user);
   const loginError = useAuthStore((state) => state.loginError);
   const loginOperacional = useAuthStore((state) => state.loginOperacional);
-  const loginEntregador = useAuthStore((state) => state.loginEntregador);
 
-  const [mode, setMode] = useState<LoginMode>("operacional");
   const [password, setPassword] = useState("");
-  const [cpf, setCpf] = useState("");
 
   const from =
     (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ??
@@ -32,23 +26,9 @@ export default function Login() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const ok =
-      mode === "operacional"
-        ? loginOperacional(password)
-        : loginEntregador(cpf);
-
+    const ok = loginOperacional(password);
     if (!ok) return;
-
-    if (mode === "operacional") {
-      navigate(from ?? "/", { replace: true });
-      return;
-    }
-
-    navigate("/entregador", { replace: true });
-  };
-
-  const onCpfChange = (value: string) => {
-    setCpf(formatCPF(normalizeCPF(value)));
+    navigate(from ?? "/", { replace: true });
   };
 
   return (
@@ -69,68 +49,33 @@ export default function Login() {
             />
             <span className="inline-flex items-center gap-2 rounded-full border border-[#2563eb]/30 bg-[#2563eb]/10 px-4 py-2 text-xs uppercase tracking-[0.28em] text-[#dbeafe]">
               <RadioTower className="h-4 w-4" />
-              Acesso restrito
+              Acesso restrito a equipe
             </span>
           </div>
 
           <h1 className="mt-6 text-3xl font-semibold leading-tight sm:text-4xl">
-            ALX Filas
+            ALX Filas - Painel operacional
           </h1>
           <p className="mt-3 text-sm leading-7 text-slate-300">
-            Escolha seu perfil para entrar na operacao ou no painel do entregador.
+            Entrada exclusiva para a equipe de operacao. Entregadores utilizam o link
+            separado.
           </p>
-
-          <div className="mt-8 grid grid-cols-2 gap-3 rounded-[24px] border border-white/10 bg-black/15 p-2">
-            <button
-              type="button"
-              onClick={() => setMode("operacional")}
-              className={
-                mode === "operacional"
-                  ? "rounded-[20px] bg-white/10 px-4 py-3 text-sm font-semibold text-white"
-                  : "rounded-[20px] px-4 py-3 text-sm text-slate-300 transition hover:text-white"
-              }
-            >
-              Operacional
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("entregador")}
-              className={
-                mode === "entregador"
-                  ? "rounded-[20px] bg-white/10 px-4 py-3 text-sm font-semibold text-white"
-                  : "rounded-[20px] px-4 py-3 text-sm text-slate-300 transition hover:text-white"
-              }
-            >
-              Entregador
-            </button>
-          </div>
 
           <form
             onSubmit={handleSubmit}
             className="mt-8 space-y-5 rounded-[28px] border border-white/10 bg-white/[0.04] p-6 backdrop-blur"
           >
-            {mode === "operacional" ? (
-              <label className="block space-y-2 text-sm text-slate-300">
-                <span>Senha operacional</span>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  placeholder="Digite a senha da operacao"
-                  className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-[#38bdf8]/60"
-                />
-              </label>
-            ) : (
-              <label className="block space-y-2 text-sm text-slate-300">
-                <span>CPF</span>
-                <input
-                  value={cpf}
-                  onChange={(event) => onCpfChange(event.target.value)}
-                  placeholder="Digite seu CPF"
-                  className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-[#f97316]/60"
-                />
-              </label>
-            )}
+            <input type="hidden" name="mode" value="operacional" />
+            <label className="block space-y-2 text-sm text-slate-300">
+              <span>Senha operacional</span>
+              <input
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Digite a senha da operacao"
+                className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-[#38bdf8]/60"
+              />
+            </label>
 
             {loginError ? (
               <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">

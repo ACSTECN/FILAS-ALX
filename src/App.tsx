@@ -17,14 +17,7 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/entregador"
-          element={
-            <ProtectedRoute allowedRoles="entregador">
-              <Entregador />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/entregador" element={<Entregador />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>

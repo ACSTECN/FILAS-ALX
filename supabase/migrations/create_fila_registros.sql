@@ -2,7 +2,10 @@ create extension if not exists pgcrypto;
 
 create table if not exists public.fila_registros (
     id uuid primary key default gen_random_uuid(),
-    codigo_pessoa text not null,
+    origem text not null default 'operacional' check (origem in ('operacional', 'entregador')),
+    tipo text not null default 'FILA' check (tipo in ('FILA', 'TPR', 'ENTREGADOR')),
+    codigo_pessoa text,
+    cpf text,
     nome text not null,
     cidade text not null check (cidade in ('Rio de Janeiro', 'São Paulo')),
     hotzone text not null check (
@@ -22,9 +25,20 @@ create table if not exists public.fila_registros (
     ),
     data_fila date not null default current_date,
     status text not null default 'na_fila_fila' check (
-        status in ('na_fila_fila', 'na_fila_tpr', 'atribuido_fila', 'atribuido_tpr', 'retirado_fila', 'retirado_tpr')
+        status in (
+            'na_fila_fila',
+            'na_fila_tpr',
+            'na_fila_entregador',
+            'atribuido_fila',
+            'atribuido_tpr',
+            'atribuido_entregador',
+            'retirado_fila',
+            'retirado_tpr',
+            'retirado_entregador'
+        )
     ),
     analista text,
+    entregador_contato text,
     criado_em timestamptz not null default now()
 );
 
@@ -36,6 +50,12 @@ create index if not exists fila_registros_cidade_hotzone_idx
 
 create index if not exists fila_registros_status_idx
     on public.fila_registros (status);
+
+create index if not exists fila_registros_origem_idx
+    on public.fila_registros (origem);
+
+create index if not exists fila_registros_cpf_idx
+    on public.fila_registros (cpf);
 
 alter table public.fila_registros enable row level security;
 

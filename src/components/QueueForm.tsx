@@ -2,6 +2,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { ArrowRight, LoaderCircle } from "lucide-react";
 import { hotzonesByCity, shiftOptions } from "@/data/hotzones";
 import type { AssignmentKind, City, Hotzone, QueueFormValues, Shift } from "@/types/queue";
+import { formatCPF, normalizeCPF } from "@/types/auth";
 
 type QueueFormProps = {
   activeCity: City;
@@ -19,6 +20,7 @@ export function QueueForm({
   onSubmit,
 }: QueueFormProps) {
   const [codigo, setCodigo] = useState("");
+  const [cpf, setCpf] = useState("");
   const [nome, setNome] = useState("");
   const [tipo, setTipo] = useState<AssignmentKind>("FILA");
   const [turno, setTurno] = useState<Shift>("Flexível");
@@ -41,7 +43,9 @@ export function QueueForm({
     }
 
     await onSubmit({
+      origem: "operacional",
       codigo_pessoa: codigo.trim(),
+      cpf: normalizeCPF(cpf) || null,
       nome: nome.trim(),
       cidade: activeCity,
       hotzone: selectedHotzone,
@@ -51,6 +55,7 @@ export function QueueForm({
     });
 
     setCodigo("");
+    setCpf("");
     setNome("");
     setTipo("FILA");
     setTurno("Flexível");
@@ -76,21 +81,31 @@ export function QueueForm({
 
       <div className="mt-6 grid gap-4 md:grid-cols-2">
         <label className="space-y-2 text-sm text-slate-300">
-          <span>ID</span>
+          <span>CPF (ID)</span>
           <input
-            value={codigo}
-            onChange={(event) => setCodigo(event.target.value)}
-            placeholder="Digite seu identificador"
+            value={cpf}
+            onChange={(event) => setCpf(formatCPF(normalizeCPF(event.target.value)))}
+            placeholder="CPF para controle (opcional)"
             className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-[#2563eb]/60"
           />
         </label>
 
         <label className="space-y-2 text-sm text-slate-300">
+          <span>Codigo pessoa</span>
+          <input
+            value={codigo}
+            onChange={(event) => setCodigo(event.target.value)}
+            placeholder="Digite o identificador interno"
+            className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-[#2563eb]/60"
+          />
+        </label>
+
+        <label className="space-y-2 text-sm text-slate-300 md:col-span-2">
           <span>Nome</span>
           <input
             value={nome}
             onChange={(event) => setNome(event.target.value)}
-            placeholder="Digite seu nome"
+            placeholder="Digite o nome completo"
             className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-[#2563eb]/60"
           />
         </label>

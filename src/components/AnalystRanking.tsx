@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Crown, Sparkles, UsersRound } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import type { AssignmentKind, City } from "@/types/queue";
+import type { City } from "@/types/queue";
+import type { UnifiedItemKind } from "@/types/unified";
 
 type RankingRow = {
   analista: string;
@@ -70,7 +71,7 @@ function getMonthRange(year: string, month: string) {
 
 export function AnalystRanking() {
   const [city, setCity] = useState<City | "Todas">("Todas");
-  const [kind, setKind] = useState<AssignmentKind | "Todas">("Todas");
+  const [kind, setKind] = useState<UnifiedItemKind | "Todas">("Todas");
   const [month, setMonth] = useState(() => new Date().toLocaleDateString("en-CA").slice(5, 7));
   const [year, setYear] = useState(() => String(new Date().getFullYear()));
   const [loading, setLoading] = useState(true);
@@ -90,18 +91,25 @@ export function AnalystRanking() {
 
     const range = getMonthRange(year, month);
 
-    const status =
-      kind === "FILA"
-        ? ["atribuido_fila", "atribuido"]
-        : kind === "TPR"
-          ? ["atribuido_tpr"]
-          : ["atribuido_fila", "atribuido_tpr", "atribuido"];
-
     let query = supabase
       .from("fila_registros")
       .select("analista,data_fila,cidade")
-      .in("status", status)
       .not("analista", "is", null);
+
+    if (kind === "FILA") {
+      query = query.in("status", ["atribuido_fila", "atribuido"]);
+    } else if (kind === "TPR") {
+      query = query.in("status", ["atribuido_tpr"]);
+    } else if (kind === "ENTREGADOR") {
+      query = query.in("status", ["atribuido_entregador"]);
+    } else {
+      query = query.in("status", [
+        "atribuido_fila",
+        "atribuido_tpr",
+        "atribuido_entregador",
+        "atribuido",
+      ]);
+    }
 
     if (city !== "Todas") {
       query = query.eq("cidade", city);
@@ -203,7 +211,7 @@ export function AnalystRanking() {
             </select>
             <select
               value={kind}
-              onChange={(event) => setKind(event.target.value as AssignmentKind | "Todas")}
+              onChange={(event) => setKind(event.target.value as UnifiedItemKind | "Todas")}
               className="alx-field rounded-2xl border border-white/10 px-4 py-3 text-sm text-white outline-none"
             >
               <option value="Todas" className="bg-slate-950 text-white">
@@ -214,6 +222,9 @@ export function AnalystRanking() {
               </option>
               <option value="TPR" className="bg-slate-950 text-white">
                 TPR
+              </option>
+              <option value="ENTREGADOR" className="bg-slate-950 text-white">
+                Entregador
               </option>
             </select>
             <select

@@ -19,7 +19,7 @@ export function QueueFilters({ filters, onChange }: QueueFiltersProps) {
         Filtros da fila
       </div>
 
-      <div className="grid flex-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid flex-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
         <select
           value={filters.cidade}
           onChange={(event) =>
@@ -30,9 +30,15 @@ export function QueueFilters({ filters, onChange }: QueueFiltersProps) {
           }
           className="alx-field rounded-2xl border border-white/10 px-4 py-3 text-sm text-white outline-none"
         >
-          <option value="Todas" className="bg-slate-950 text-white">Todas as cidades</option>
-          <option value="Rio de Janeiro" className="bg-slate-950 text-white">Rio de Janeiro</option>
-          <option value="São Paulo" className="bg-slate-950 text-white">São Paulo</option>
+          <option value="Todas" className="bg-slate-950 text-white">
+            Todas as cidades
+          </option>
+          <option value="Rio de Janeiro" className="bg-slate-950 text-white">
+            Rio de Janeiro
+          </option>
+          <option value="São Paulo" className="bg-slate-950 text-white">
+            São Paulo
+          </option>
         </select>
 
         <select
@@ -42,7 +48,9 @@ export function QueueFilters({ filters, onChange }: QueueFiltersProps) {
           }
           className="alx-field rounded-2xl border border-white/10 px-4 py-3 text-sm text-white outline-none"
         >
-          <option value="Todas" className="bg-slate-950 text-white">Todas as hotzones</option>
+          <option value="Todas" className="bg-slate-950 text-white">
+            Todas as hotzones
+          </option>
           {allHotzones
             .filter((hotzone) =>
               filters.cidade === "Todas"
@@ -65,12 +73,53 @@ export function QueueFilters({ filters, onChange }: QueueFiltersProps) {
           }
           className="alx-field rounded-2xl border border-white/10 px-4 py-3 text-sm text-white outline-none"
         >
-          <option value="Todos" className="bg-slate-950 text-white">Todos os turnos</option>
+          <option value="Todos" className="bg-slate-950 text-white">
+            Todos os turnos
+          </option>
           {shiftOptions.map((shift) => (
             <option key={shift} value={shift} className="bg-slate-950 text-white">
               {shift}
             </option>
           ))}
+        </select>
+
+        <select
+          value={filters.origem}
+          onChange={(event) =>
+            onChange({ origem: event.target.value as QueueFiltersType["origem"] })
+          }
+          className="alx-field rounded-2xl border border-white/10 px-4 py-3 text-sm text-white outline-none"
+        >
+          <option value="Todas" className="bg-slate-950 text-white">
+            Todas as origens
+          </option>
+          <option value="operacional" className="bg-slate-950 text-white">
+            Equipe operacional
+          </option>
+          <option value="entregador" className="bg-slate-950 text-white">
+            Interesse do entregador
+          </option>
+        </select>
+
+        <select
+          value={filters.tipo}
+          onChange={(event) =>
+            onChange({ tipo: event.target.value as QueueFiltersType["tipo"] })
+          }
+          className="alx-field rounded-2xl border border-white/10 px-4 py-3 text-sm text-white outline-none"
+        >
+          <option value="Todas" className="bg-slate-950 text-white">
+            Todos os tipos
+          </option>
+          <option value="FILA" className="bg-slate-950 text-white">
+            Fila
+          </option>
+          <option value="TPR" className="bg-slate-950 text-white">
+            TPR
+          </option>
+          <option value="ENTREGADOR" className="bg-slate-950 text-white">
+            Entregador
+          </option>
         </select>
 
         <div className="flex gap-2">

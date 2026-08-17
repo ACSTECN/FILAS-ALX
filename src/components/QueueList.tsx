@@ -1,6 +1,12 @@
 import { CheckCircle2, LoaderCircle, Trash2 } from "lucide-react";
-import { formatClock, formatDate, formatDateTime, formatPosition } from "@/lib/format";
+import {
+  formatClock,
+  formatDate,
+  formatDateTime,
+  formatPosition,
+} from "@/lib/format";
 import type { QueueRecord } from "@/types/queue";
+import { formatCPF } from "@/types/auth";
 
 type QueueListProps = {
   records: QueueRecord[];
@@ -10,6 +16,16 @@ type QueueListProps = {
   onAssign: (id: string) => Promise<void>;
 };
 
+function kindLabel(tipo: QueueRecord["tipo"]) {
+  if (tipo === "ENTREGADOR") return "Entregador";
+  if (tipo === "TPR") return "TPR";
+  return "Fila";
+}
+
+function origemLabel(origem: QueueRecord["origem"]) {
+  return origem === "entregador" ? "Interesse entregador" : "Equipe operacional";
+}
+
 export function QueueList({
   records,
   loading,
@@ -17,12 +33,12 @@ export function QueueList({
   onRemove,
   onAssign,
 }: QueueListProps) {
-  const statusLabel = (status: QueueRecord["status"]) => {
-    const kind = status.endsWith("_tpr") ? "TPR" : "FILA";
-    if (status.startsWith("atribuido")) {
+  const statusLabel = (record: QueueRecord) => {
+    const kind = kindLabel(record.tipo);
+    if (record.status.startsWith("atribuido")) {
       return `Atribuido ${kind}`;
     }
-    if (status.startsWith("retirado")) {
+    if (record.status.startsWith("retirado")) {
       return `Retirado ${kind}`;
     }
     return `Na fila ${kind}`;
@@ -44,7 +60,7 @@ export function QueueList({
       <div className="rounded-[32px] border border-dashed border-white/10 bg-white/5 p-8 text-center">
         <p className="text-lg font-medium text-white">Fila vazia no momento</p>
         <p className="mt-2 text-sm text-slate-400">
-          O primeiro cadastro aparece aqui assim que entrar na lista.
+          Cadastros da equipe e interesses dos entregadores aparecem aqui.
         </p>
       </div>
     );
@@ -55,7 +71,7 @@ export function QueueList({
       {records.map((record, index) => (
         <article
           key={record.id}
-          className="alx-card grid gap-4 rounded-[28px] border border-white/10 p-5 shadow-[0_18px_60px_rgba(2,6,23,0.28)] lg:grid-cols-[88px_1.4fr_1fr_160px]"
+          className="alx-card grid gap-4 rounded-[28px] border border-white/10 p-5 shadow-[0_18px_60px_rgba(2,6,23,0.28)] lg:grid-cols-[88px_1.5fr_1fr_160px]"
         >
           <div className="flex items-center gap-4 lg:block">
             <span className="inline-flex rounded-2xl bg-gradient-to-br from-[#2563eb]/25 to-[#f97316]/20 px-4 py-3 text-2xl font-semibold text-white">
@@ -72,8 +88,32 @@ export function QueueList({
           </div>
 
           <div>
-            <p className="text-lg font-semibold text-white">{record.nome}</p>
-            <p className="mt-1 text-sm text-slate-300">ID: {record.codigo_pessoa}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-lg font-semibold text-white">{record.nome}</p>
+              <span
+                className={
+                  record.origem === "entregador"
+                    ? "rounded-full border border-[#f97316]/30 bg-[#f97316]/10 px-3 py-1 text-[11px] text-[#ffedd5]"
+                    : "rounded-full border border-[#2563eb]/30 bg-[#2563eb]/10 px-3 py-1 text-[11px] text-[#dbeafe]"
+                }
+              >
+                {origemLabel(record.origem)}
+              </span>
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-slate-200">
+                {kindLabel(record.tipo)}
+              </span>
+            </div>
+            <p className="mt-2 text-sm text-slate-300">
+              CPF:{" "}
+              <span className="font-medium text-slate-100">
+                {record.cpf ? formatCPF(record.cpf) : "-"}
+              </span>
+            </p>
+            {record.codigo_pessoa ? (
+              <p className="mt-1 text-sm text-slate-400">
+                Codigo pessoa: {record.codigo_pessoa}
+              </p>
+            ) : null}
             <p className="mt-3 text-xs uppercase tracking-[0.22em] text-slate-500">
               Hotzone
             </p>
@@ -95,11 +135,12 @@ export function QueueList({
             {record.status.startsWith("atribuido") ? (
               <span className="mt-2 inline-flex items-center gap-2 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-sm font-medium text-emerald-100">
                 <CheckCircle2 className="h-4 w-4" />
-                {statusLabel(record.status)} · Registrado por: {record.analista ?? "-"}
+                {statusLabel(record)}
+                {record.analista ? ` · Registrado por: ${record.analista}` : ""}
               </span>
             ) : (
               <span className="mt-2 inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm font-medium text-slate-200">
-                {statusLabel(record.status)}
+                {statusLabel(record)}
               </span>
             )}
             <p className="mt-4 text-xs uppercase tracking-[0.22em] text-slate-500">

@@ -11,6 +11,8 @@ const defaultFilters: QueueFilters = {
   hotzone: "Todas",
   turno_desejado: "Todos",
   data_fila: "Todas",
+  origem: "Todas",
+  tipo: "Todas",
 };
 
 type QueueStore = {
@@ -23,6 +25,7 @@ type QueueStore = {
   setFilters: (filters: Partial<QueueFilters>) => void;
   setAnalystName: (value: string) => void;
   loadQueue: () => Promise<void>;
+  loadEntregadorQueue: (cpf: string) => Promise<void>;
   createRecord: (values: QueueFormValues) => Promise<void>;
   removeRecord: (id: string) => Promise<void>;
   assignRecord: (id: string) => Promise<void>;
@@ -69,49 +72,91 @@ function writeLocalQueue(records: QueueRecord[]) {
 
 function normalizeStatus(
   status: QueueRecord["status"] | string | null | undefined,
+  fallback: QueueRecord["status"] = "na_fila_fila",
 ): QueueRecord["status"] {
-  if (status === "na_fila") {
-    return "na_fila_fila";
+  const valid: QueueRecord["status"][] = [
+    "na_fila_fila",
+    "na_fila_tpr",
+    "na_fila_entregador",
+    "atribuido_fila",
+    "atribuido_tpr",
+    "atribuido_entregador",
+    "retirado_fila",
+    "retirado_tpr",
+    "retirado_entregador",
+  ];
+
+  if (status === "na_fila") return "na_fila_fila";
+  if (status === "atribuido") return "atribuido_fila";
+  if (status === "retirado") return "retirado_fila";
+  if (status && valid.includes(status as QueueRecord["status"])) {
+    return status as QueueRecord["status"];
   }
 
-  if (status === "atribuido") {
-    return "atribuido_fila";
-  }
+  return fallback;
+}
 
-  if (status === "retirado") {
-    return "retirado_fila";
-  }
+function normalizeOrigem(
+  origem: QueueRecord["origem"] | string | null | undefined,
+): QueueRecord["origem"] {
+  return origem === "entregador" ? "entregador" : "operacional";
+}
 
-  if (
-    status === "na_fila_fila" ||
-    status === "na_fila_tpr" ||
-    status === "atribuido_fila" ||
-    status === "atribuido_tpr" ||
-    status === "retirado_fila" ||
-    status === "retirado_tpr"
-  ) {
-    return status;
+function normalizeTipo(
+  tipo: QueueRecord["tipo"] | string | null | undefined,
+  status: QueueRecord["status"] | string | null | undefined,
+): QueueRecord["tipo"] {
+  if (tipo === "FILA" || tipo === "TPR" || tipo === "ENTREGADOR") {
+    return tipo;
   }
-
-  return "na_fila_fila";
+  const normalized = normalizeStatus(status, "na_fila_fila");
+  if (normalized.endsWith("_tpr")) return "TPR";
+  if (normalized.endsWith("_entregador")) return "ENTREGADOR";
+  return "FILA";
 }
 
 function isQueueStatus(status: QueueRecord["status"] | string | null | undefined) {
   const normalized = normalizeStatus(status);
-  return normalized === "na_fila_fila" || normalized === "na_fila_tpr";
+  return (
+    normalized === "na_fila_fila" ||
+    normalized === "na_fila_tpr" ||
+    normalized === "na_fila_entregador"
+  );
 }
 
 function isTprStatus(status: QueueRecord["status"] | string | null | undefined) {
   return normalizeStatus(status).endsWith("_tpr");
 }
 
+function isEntregadorStatus(status: QueueRecord["status"] | string | null | undefined) {
+  return normalizeStatus(status).endsWith("_entregador");
+}
+
+function deriveNextStatus(
+  current: QueueRecord["status"],
+  target: "atribuido" | "retirado",
+): QueueRecord["status"] {
+  if (target === "atribuido") {
+    if (isTprStatus(current)) return "atribuido_tpr";
+    if (isEntregadorStatus(current)) return "atribuido_entregador";
+    return "atribuido_fila";
+  }
+  if (isTprStatus(current)) return "retirado_tpr";
+  if (isEntregadorStatus(current)) return "retirado_entregador";
+  return "retirado_fila";
+}
+
 function normalizeQueue(records: QueueRecord[]) {
   return [...records]
     .map((record) => ({
       ...record,
+      origem: normalizeOrigem(record.origem),
+      tipo: normalizeTipo(record.tipo, record.status),
       data_fila: record.data_fila ?? record.criado_em.slice(0, 10),
       status: normalizeStatus(record.status),
       analista: record.analista ?? null,
+      codigo_pessoa: record.codigo_pessoa ?? null,
+      cpf: record.cpf ?? null,
     }))
     .filter((record) => !isExpiredQueueDate(record.data_fila))
     .filter((record) => isQueueStatus(record.status))
@@ -144,7 +189,12 @@ export const useQueueStore = create<QueueStore>((set) => ({
         .from("fila_registros")
         .select("*")
         .gte("data_fila", todayKey)
-        .in("status", ["na_fila_fila", "na_fila_tpr", "na_fila"])
+        .in("status", [
+          "na_fila_fila",
+          "na_fila_tpr",
+          "na_fila_entregador",
+          "na_fila",
+        ])
         .order("criado_em", { ascending: true });
 
       if (error) {
@@ -173,19 +223,82 @@ export const useQueueStore = create<QueueStore>((set) => ({
     writeLocalQueue(localQueue);
     set({ queue: localQueue, loading: false, error: null });
   },
+  loadEntregadorQueue: async (cpf) => {
+    set({ loading: true, error: null });
+
+    if (supabase) {
+      const todayKey = getTodayKey();
+
+      const { data, error } = await supabase
+        .from("fila_registros")
+        .select("*")
+        .gte("data_fila", todayKey)
+        .eq("cpf", cpf)
+        .order("criado_em", { ascending: true });
+
+      if (error) {
+        set({ loading: false, error: "Nao foi possivel carregar seus agendamentos." });
+        return;
+      }
+
+      set({
+        queue: normalizeQueue((data ?? []) as QueueRecord[]),
+        loading: false,
+        error: null,
+      });
+      return;
+    }
+
+    if (!canUseLocalFallback) {
+      set({
+        queue: [],
+        loading: false,
+        error:
+          "Supabase nao conectado neste deploy. Configure a URL e a anon key na Vercel.",
+      });
+      return;
+    }
+
+    const localQueue = readLocalQueue().filter((record) => record.cpf === cpf);
+    set({ queue: localQueue, loading: false, error: null });
+  },
   createRecord: async (values) => {
     set({ syncing: true, error: null });
 
     const analystName = useQueueStore.getState().analystName.trim();
     const { tipo_atribuicao, ...payload } = values;
-    const status = tipo_atribuicao === "TPR" ? "na_fila_tpr" : "na_fila_fila";
+
+    const origem = payload.origem ?? "operacional";
+    const tipo =
+      payload.tipo ??
+      (origem === "entregador"
+        ? "ENTREGADOR"
+        : tipo_atribuicao === "TPR"
+          ? "TPR"
+          : "FILA");
+    const status: QueueRecord["status"] =
+      tipo === "TPR"
+        ? "na_fila_tpr"
+        : tipo === "ENTREGADOR"
+          ? "na_fila_entregador"
+          : "na_fila_fila";
+
+    const analista = origem === "entregador" ? null : analystName ? analystName : null;
+
+    const insertPayload = {
+      ...payload,
+      origem,
+      tipo,
+      status,
+      analista,
+      codigo_pessoa: payload.codigo_pessoa ?? null,
+      cpf: payload.cpf ?? null,
+    };
 
     if (supabase) {
-      const { error } = await supabase.from("fila_registros").insert({
-        ...payload,
-        status,
-        analista: analystName ? analystName : null,
-      } as never);
+      const { error } = await supabase
+        .from("fila_registros")
+        .insert(insertPayload as never);
 
       if (error) {
         set({ syncing: false, error: "Nao foi possivel entrar na fila." });
@@ -207,11 +320,21 @@ export const useQueueStore = create<QueueStore>((set) => ({
 
     const nextRecord: QueueRecord = {
       id: crypto.randomUUID(),
-      ...payload,
+      origem: insertPayload.origem,
+      tipo: insertPayload.tipo,
+      codigo_pessoa: insertPayload.codigo_pessoa ?? null,
+      cpf: insertPayload.cpf ?? null,
+      nome: payload.nome,
+      cidade: payload.cidade,
+      hotzone: payload.hotzone,
+      turno_desejado: payload.turno_desejado,
+      data_fila: payload.data_fila,
       status,
-      analista: analystName ? analystName : null,
+      analista,
+      entregador_contato: payload.entregador_contato ?? null,
       criado_em: new Date().toISOString(),
     };
+
     const nextQueue = normalizeQueue([...useQueueStore.getState().queue, nextRecord]);
 
     writeLocalQueue(nextQueue);
@@ -222,7 +345,9 @@ export const useQueueStore = create<QueueStore>((set) => ({
 
     if (supabase) {
       const current = useQueueStore.getState().queue.find((record) => record.id === id);
-      const status = isTprStatus(current?.status) ? "retirado_tpr" : "retirado_fila";
+      const status = current
+        ? deriveNextStatus(current.status, "retirado")
+        : "retirado_fila";
       const analystName = useQueueStore.getState().analystName.trim();
       const { error } = await supabase
         .from("fila_registros")
@@ -251,7 +376,9 @@ export const useQueueStore = create<QueueStore>((set) => ({
     }
 
     const current = useQueueStore.getState().queue.find((record) => record.id === id);
-    const status = isTprStatus(current?.status) ? "retirado_tpr" : "retirado_fila";
+    const status = current
+      ? deriveNextStatus(current.status, "retirado")
+      : "retirado_fila";
     const analystName = useQueueStore.getState().analystName.trim();
     const nextQueue = normalizeQueue(
       useQueueStore.getState().queue.map((record) =>
@@ -272,7 +399,9 @@ export const useQueueStore = create<QueueStore>((set) => ({
 
     if (supabase) {
       const current = useQueueStore.getState().queue.find((record) => record.id === id);
-      const status = isTprStatus(current?.status) ? "atribuido_tpr" : "atribuido_fila";
+      const status = current
+        ? deriveNextStatus(current.status, "atribuido")
+        : "atribuido_fila";
       const { error } = await supabase
         .from("fila_registros")
         .update({ status } as never)
@@ -297,7 +426,9 @@ export const useQueueStore = create<QueueStore>((set) => ({
     }
 
     const current = useQueueStore.getState().queue.find((record) => record.id === id);
-    const status = isTprStatus(current?.status) ? "atribuido_tpr" : "atribuido_fila";
+    const status = current
+      ? deriveNextStatus(current.status, "atribuido")
+      : "atribuido_fila";
     const nextQueue = normalizeQueue(
       useQueueStore.getState().queue.map((record) =>
         record.id === id

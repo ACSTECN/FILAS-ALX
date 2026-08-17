@@ -1,5 +1,12 @@
-import { useMemo, useState } from "react";
-import { BellElectric, DatabaseZap, Map, RadioTower } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  BellElectric,
+  DatabaseZap,
+  LogOut,
+  Map,
+  RadioTower,
+  User,
+} from "lucide-react";
 import { CitySwitch } from "@/components/CitySwitch";
 import { HotzoneGrid } from "@/components/HotzoneGrid";
 import { AnalystRanking } from "@/components/AnalystRanking";
@@ -11,9 +18,13 @@ import { hotzonesByCity } from "@/data/hotzones";
 import { useQueueRealtime } from "@/hooks/useQueueRealtime";
 import { hasSupabaseConfig } from "@/lib/supabase";
 import { useQueueStore } from "@/store/queueStore";
+import { useAuthStore } from "@/store/authStore";
 import type { City, QueueFilters as QueueFiltersType } from "@/types/queue";
 
 export default function Home() {
+  const user = useAuthStore((state) => state.user);
+  const logout = useAuthStore((state) => state.logout);
+
   const [activeTab, setActiveTab] = useState<"fila" | "ranking">("fila");
   const [activeCity, setActiveCity] = useState<City>("Rio de Janeiro");
   const [selectedHotzone, setSelectedHotzone] = useState(
@@ -25,6 +36,7 @@ export default function Home() {
   const loading = useQueueStore((state) => state.loading);
   const syncing = useQueueStore((state) => state.syncing);
   const error = useQueueStore((state) => state.error);
+  const loadQueue = useQueueStore((state) => state.loadQueue);
   const setFilters = useQueueStore((state) => state.setFilters);
   const analystName = useQueueStore((state) => state.analystName);
   const setAnalystName = useQueueStore((state) => state.setAnalystName);
@@ -34,16 +46,25 @@ export default function Home() {
 
   useQueueRealtime();
 
+  useEffect(() => {
+    void loadQueue();
+  }, [loadQueue]);
+
   const filteredQueue = useMemo(() => {
     return queue.filter((record) => {
       const byCity = filters.cidade === "Todas" || record.cidade === filters.cidade;
-      const byHotzone = filters.hotzone === "Todas" || record.hotzone === filters.hotzone;
+      const byHotzone =
+        filters.hotzone === "Todas" || record.hotzone === filters.hotzone;
       const byShift =
         filters.turno_desejado === "Todos" ||
         record.turno_desejado === filters.turno_desejado;
-      const byDate = filters.data_fila === "Todas" || record.data_fila === filters.data_fila;
+      const byDate =
+        filters.data_fila === "Todas" || record.data_fila === filters.data_fila;
+      const byOrigem =
+        filters.origem === "Todas" || record.origem === filters.origem;
+      const byTipo = filters.tipo === "Todas" || record.tipo === filters.tipo;
 
-      return byCity && byHotzone && byShift && byDate;
+      return byCity && byHotzone && byShift && byDate && byOrigem && byTipo;
     });
   }, [filters, queue]);
 
@@ -82,17 +103,17 @@ export default function Home() {
                   <RadioTower className="h-4 w-4" />
                   Operacao ao vivo
                 </span>
+                <span className="inline-flex items-center gap-2 rounded-full border border-[#f97316]/30 bg-[#f97316]/10 px-4 py-2 text-xs uppercase tracking-[0.28em] text-[#ffedd5]">
+                  <User className="h-4 w-4" />
+                  Dashboard operacional
+                </span>
               </div>
-              <span className="inline-flex items-center gap-2 rounded-full border border-[#f97316]/30 bg-[#f97316]/10 px-4 py-2 text-xs uppercase tracking-[0.28em] text-[#ffedd5]">
-                <RadioTower className="h-4 w-4" />
-                ALX Entregas ao vivo
-              </span>
               <h1 className="mt-6 max-w-4xl font-display text-4xl font-semibold leading-tight text-white sm:text-5xl xl:text-6xl">
-                Fila operacional por hotzone para Rio e São Paulo.
+                Fila unificada: equipe + interesses de entregadores.
               </h1>
               <p className="mt-5 max-w-2xl text-base leading-7 text-slate-300">
-                Cadastro publico, visualização em tempo real e retirada imediata da
-                fila em um painel feito para operação rápida.
+                Cadastro rapido, visualização em tempo real e separacao por
+                origem/tipo (Fila, TPR ou Entregador) para operação rápida.
               </p>
             </div>
 
@@ -102,7 +123,7 @@ export default function Home() {
                 {
                   icon: BellElectric,
                   label: "Fila aberta",
-                  detail: "Todos conseguem entrar e acompanhar",
+                  detail: "Equipe e entregadores em tempo real",
                 },
                 {
                   icon: DatabaseZap,
@@ -121,6 +142,23 @@ export default function Home() {
                   <p className="mt-2 text-sm text-slate-400">{item.detail}</p>
                 </div>
               ))}
+
+              <div className="flex flex-col gap-2 rounded-[24px] border border-white/10 bg-black/25 p-4">
+                <p className="text-xs uppercase tracking-[0.28em] text-slate-500">
+                  Sessao
+                </p>
+                <p className="text-sm font-semibold text-white">
+                  {user?.role === "operacional" ? "Equipe operacional" : "Acesso"}
+                </p>
+                <button
+                  type="button"
+                  onClick={logout}
+                  className="mt-1 inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 px-4 py-3 text-sm text-slate-200 transition hover:border-white/20 hover:text-white"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sair
+                </button>
+              </div>
             </div>
           </div>
 
@@ -228,7 +266,8 @@ export default function Home() {
                   className="alx-field mt-5 w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-[#38bdf8]/60"
                 />
                 <p className="mt-3 text-sm text-slate-400">
-                  Esse nome marca quem colocou o entregador na fila (e conta no ranking quando for atribuido).
+                  Esse nome marca quem colocou o entregador na fila (e conta no ranking
+                  quando for atribuido).
                 </p>
               </div>
               <QueueForm

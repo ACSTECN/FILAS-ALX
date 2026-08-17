@@ -21,7 +21,7 @@ test("README documenta variaveis da Vercel e do Supabase", async () => {
 test("pagina principal possui identidade da ALX Entregas", async () => {
   const homePage = await readFile("src/pages/Home.tsx", "utf8");
 
-  assert.match(homePage, /ALX Entregas ao vivo/);
-  assert.match(homePage, /Fila operacional por hotzone/);
+  assert.match(homePage, /Dashboard operacional/);
+  assert.match(homePage, /Fila unificada/);
   assert.match(homePage, /Modo local ativo/);
 });

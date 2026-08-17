@@ -1,3 +1,5 @@
+import type { RecordSource, UnifiedItemKind } from "./unified";
+
 export type City = "Rio de Janeiro" | "São Paulo";
 
 export type Shift = "Manhã" | "Tarde" | "Noite" | "Ceia" | "Flexível";
@@ -17,14 +19,20 @@ export type AssignmentKind = "FILA" | "TPR";
 export type QueueStatus =
   | "na_fila_fila"
   | "na_fila_tpr"
+  | "na_fila_entregador"
   | "atribuido_fila"
   | "atribuido_tpr"
+  | "atribuido_entregador"
   | "retirado_fila"
-  | "retirado_tpr";
+  | "retirado_tpr"
+  | "retirado_entregador";
 
 export type QueueRecord = {
   id: string;
-  codigo_pessoa: string;
+  origem: RecordSource;
+  tipo: UnifiedItemKind;
+  codigo_pessoa: string | null;
+  cpf: string | null;
   nome: string;
   cidade: City;
   hotzone: Hotzone;
@@ -32,19 +40,24 @@ export type QueueRecord = {
   data_fila: string;
   status: QueueStatus;
   analista: string | null;
+  entregador_contato?: string | null;
   criado_em: string;
 };
 
 export type QueueFormValues = {
-  codigo_pessoa: string;
+  origem?: RecordSource;
+  tipo?: UnifiedItemKind;
+  codigo_pessoa: string | null;
+  cpf?: string | null;
   nome: string;
   cidade: City;
   hotzone: Hotzone;
-  tipo_atribuicao: AssignmentKind;
+  tipo_atribuicao?: AssignmentKind;
   turno_desejado: Shift;
   data_fila: string;
   status?: QueueStatus;
   analista?: string | null;
+  entregador_contato?: string | null;
 };
 
 export type QueueFilters = {
@@ -52,4 +65,6 @@ export type QueueFilters = {
   hotzone: Hotzone | "Todas";
   turno_desejado: Shift | "Todos";
   data_fila: string | "Todas";
+  origem: RecordSource | "Todas";
+  tipo: UnifiedItemKind | "Todas";
 };

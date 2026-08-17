@@ -3,22 +3,14 @@ import { Crown, Sparkles, UsersRound } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { City } from "@/types/queue";
 import type { UnifiedItemKind } from "@/types/unified";
+import { ANALYST_USERS, type AnalystUser } from "@/types/auth";
 
 type RankingRow = {
   analista: string;
   total: number;
+  initials: string;
+  analystId: string;
 };
-
-function initials(name: string) {
-  const parts = name
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2);
-
-  const letters = parts.map((part) => part.slice(0, 1).toUpperCase()).join("");
-  return letters || name.trim().slice(0, 2).toUpperCase() || "?";
-}
 
 function colorFromName(name: string) {
   let hash = 0;
@@ -69,6 +61,38 @@ function getMonthRange(year: string, month: string) {
   return { start, end };
 }
 
+function buildRankingRows(counts: Map<string, number>): RankingRow[] {
+  const normalized = new Map<string, number>();
+  for (const [name, value] of counts.entries()) {
+    const key = name.toLowerCase();
+    normalized.set(key, (normalized.get(key) ?? 0) + value);
+  }
+
+  const rows = ANALYST_USERS.map((analyst: AnalystUser) => {
+    const total = normalized.get(analyst.name.toLowerCase()) ?? 0;
+    return {
+      analista: analyst.name,
+      initials: analyst.initials,
+      analystId: analyst.id,
+      total,
+    };
+  });
+
+  for (const [name, total] of normalized.entries()) {
+    const exists = ANALYST_USERS.some((item) => item.name.toLowerCase() === name);
+    if (!exists) {
+      rows.push({
+        analista: name,
+        initials: name.slice(0, 1).toUpperCase() || "?",
+        analystId: `ext-${name}`,
+        total,
+      });
+    }
+  }
+
+  return rows.sort((a, b) => b.total - a.total || a.analista.localeCompare(b.analista));
+}
+
 export function AnalystRanking() {
   const [city, setCity] = useState<City | "Todas">("Todas");
   const [kind, setKind] = useState<UnifiedItemKind | "Todas">("Todas");
@@ -76,14 +100,14 @@ export function AnalystRanking() {
   const [year, setYear] = useState(() => String(new Date().getFullYear()));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [rows, setRows] = useState<RankingRow[]>([]);
+  const [rows, setRows] = useState<RankingRow[]>(() => buildRankingRows(new Map()));
 
   const loadRanking = async () => {
     setLoading(true);
     setError(null);
 
     if (!supabase) {
-      setRows([]);
+      setRows(buildRankingRows(new Map()));
       setLoading(false);
       setError("Supabase nao configurado neste deploy.");
       return;
@@ -136,9 +160,7 @@ export function AnalystRanking() {
       counts.set(name, (counts.get(name) ?? 0) + 1);
     });
 
-    const nextRows = Array.from(counts.entries())
-      .map(([analista, total]) => ({ analista, total }))
-      .sort((a, b) => b.total - a.total || a.analista.localeCompare(b.analista));
+    const nextRows = buildRankingRows(counts);
 
     setRows(nextRows);
     setLoading(false);
@@ -189,7 +211,8 @@ export function AnalystRanking() {
               Analistas com mais entregadores atribuidos
             </h2>
             <p className="mt-2 text-sm text-slate-400">
-              Conta por analista que registrou a entrada na fila.
+              FILA / TPR contam para quem registrou a entrada; Entregador conta para quem
+              atribuir o interesse.
             </p>
           </div>
 
@@ -278,10 +301,14 @@ export function AnalystRanking() {
                 <Sparkles className="h-5 w-5 text-[#f97316]" />
               </div>
               <p className="mt-5 text-2xl font-semibold text-white">
-                {top3.length ? "Podio de atribuicoes" : "Sem dados"}
+                {top3.some((row) => row.total > 0)
+                  ? "Podio de atribuicoes"
+                  : "Sem dados"}
               </p>
               <p className="mt-2 text-sm text-slate-400">
-                {top3.length ? "Os 3 analistas mais ativos no periodo." : "Ainda nao houve atribuicoes"}
+                {top3.some((row) => row.total > 0)
+                  ? "Os 3 analistas mais ativos no periodo."
+                  : "Ainda nao houve atribuicoes"}
               </p>
             </div>
           </div>
@@ -307,7 +334,7 @@ export function AnalystRanking() {
               <div className="flex min-h-[420px] items-center justify-center text-slate-300">
                 Carregando ranking...
               </div>
-            ) : top3.length === 0 ? (
+            ) : !top3.some((row) => row.total > 0) ? (
               <div className="rounded-[28px] border border-dashed border-white/10 bg-white/5 p-8 text-center">
                 <p className="text-lg font-medium text-white">Sem atribuicoes</p>
                 <p className="mt-2 text-sm text-slate-400">
@@ -368,10 +395,12 @@ export function AnalystRanking() {
                                   : "linear-gradient(135deg, #38bdf8, #a78bfa)",
                               }}
                             >
-                              {initials(second.analista)}
+                              {second.initials}
                             </div>
                             <div>
-                              <p className="text-lg font-semibold text-white">{second.analista}</p>
+                              <p className="text-lg font-semibold text-white uppercase tracking-wide">
+                                {second.analista}
+                              </p>
                               <p className="mt-1 text-sm text-slate-400">Analista</p>
                             </div>
                           </div>
@@ -407,10 +436,12 @@ export function AnalystRanking() {
                             }}
                           >
                             <div className="alx-pulse absolute -inset-2 rounded-full border border-[#f59e0b]/25" />
-                            <span className="relative z-10">{initials(first.analista)}</span>
+                            <span className="relative z-10">{first.initials}</span>
                           </div>
                           <div>
-                            <p className="text-xl font-semibold text-white">{first.analista}</p>
+                            <p className="text-xl font-semibold text-white uppercase tracking-wide">
+                              {first.analista}
+                            </p>
                             <p className="mt-1 text-sm text-slate-400">Analista</p>
                           </div>
                         </div>
@@ -449,10 +480,12 @@ export function AnalystRanking() {
                                   : "linear-gradient(135deg, #f97316, #22c55e)",
                               }}
                             >
-                              {initials(third.analista)}
+                              {third.initials}
                             </div>
                             <div>
-                              <p className="text-lg font-semibold text-white">{third.analista}</p>
+                              <p className="text-lg font-semibold text-white uppercase tracking-wide">
+                                {third.analista}
+                              </p>
                               <p className="mt-1 text-sm text-slate-400">Analista</p>
                             </div>
                           </div>
@@ -500,7 +533,7 @@ export function AnalystRanking() {
 
                 return (
                   <div
-                    key={row.analista}
+                    key={row.analystId}
                     className="rounded-[24px] border border-white/10 bg-white/5 px-5 py-4"
                   >
                     <div className="flex items-center justify-between gap-4">
@@ -514,10 +547,12 @@ export function AnalystRanking() {
                             backgroundImage: `linear-gradient(135deg, ${avatar.a}, ${avatar.b})`,
                           }}
                         >
-                          {initials(row.analista)}
+                          {row.initials}
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-white">{row.analista}</p>
+                          <p className="text-sm font-semibold text-white uppercase tracking-wide">
+                            {row.analista}
+                          </p>
                           <p className="mt-1 text-xs text-slate-400">Analista</p>
                         </div>
                       </div>

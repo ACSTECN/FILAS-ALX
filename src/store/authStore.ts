@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { AuthUser, UserRole } from "@/types/auth";
 import {
-  isValidOperacionalPassword,
+  findAnalystByCredentials,
   isValidCPF,
   normalizeCPF,
 } from "@/types/auth";
@@ -35,7 +35,7 @@ function writeSession(session: AuthUser | null) {
 type AuthStore = {
   user: AuthUser | null;
   loginError: string | null;
-  loginOperacional: (password: string) => boolean;
+  loginOperacional: (analystName: string, password: string) => boolean;
   loginEntregador: (cpf: string) => boolean;
   logout: () => void;
 };
@@ -43,12 +43,19 @@ type AuthStore = {
 export const useAuthStore = create<AuthStore>((set) => ({
   user: readSession(),
   loginError: null,
-  loginOperacional: (password) => {
-    if (!isValidOperacionalPassword(password)) {
-      set({ loginError: "Senha operacional invalida." });
+  loginOperacional: (analystName, password) => {
+    const analyst = findAnalystByCredentials(analystName, password);
+    if (!analyst) {
+      set({ loginError: "Usuario ou senha invalida." });
       return false;
     }
-    const user: AuthUser = { role: "operacional", identifier: "operacional" };
+    const user: AuthUser = {
+      role: "operacional",
+      identifier: analyst.id,
+      analystId: analyst.id,
+      analystName: analyst.name,
+      analystInitials: analyst.initials,
+    };
     writeSession(user);
     set({ user, loginError: null });
     return true;

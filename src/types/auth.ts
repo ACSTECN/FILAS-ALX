@@ -1,21 +1,93 @@
 export type UserRole = "operacional" | "entregador";
 
+export type AnalystUser = {
+  id: string;
+  role: "operacional";
+  name: string;
+  initials: string;
+  password: string;
+};
+
 export type AuthUser = {
   role: UserRole;
   identifier: string;
+  analystId?: string;
+  analystName?: string;
+  analystInitials?: string;
 };
 
-export const OPERACIONAL_PASSWORD_KEY = "alx-operacional-senha";
-export const OPERACIONAL_DEFAULT_PASSWORD = "alx2026operacao";
+export const ANALYST_USERS: AnalystUser[] = [
+  {
+    id: "gustavo",
+    role: "operacional",
+    name: "Gustavo",
+    initials: "G",
+    password: "gustavo@alx",
+  },
+  {
+    id: "guilherme",
+    role: "operacional",
+    name: "Guilherme",
+    initials: "G",
+    password: "guilherme@alx",
+  },
+  {
+    id: "larissa",
+    role: "operacional",
+    name: "Larissa",
+    initials: "L",
+    password: "larissa@alx",
+  },
+  {
+    id: "carol",
+    role: "operacional",
+    name: "Carol",
+    initials: "C",
+    password: "carol@alx",
+  },
+  {
+    id: "yuri",
+    role: "operacional",
+    name: "Yuri",
+    initials: "Y",
+    password: "yuri@alx",
+  },
+  {
+    id: "luis",
+    role: "operacional",
+    name: "Luis",
+    initials: "L",
+    password: "luis@alx",
+  },
+  {
+    id: "alessandro",
+    role: "operacional",
+    name: "Alessandro",
+    initials: "A",
+    password: "alessandro@alx",
+  },
+  {
+    id: "marcelo",
+    role: "operacional",
+    name: "Marcelo",
+    initials: "M",
+    password: "marcelo@alx",
+  },
+];
 
-export function isValidOperacionalPassword(value: string) {
-  if (typeof window !== "undefined") {
-    const env = (import.meta.env.VITE_OPERACIONAL_PASSWORD as string | undefined)?.trim();
-    if (env) {
-      return value.trim() === env;
-    }
-  }
-  return value.trim() === OPERACIONAL_DEFAULT_PASSWORD;
+export function findAnalystByCredentials(nameInput: string, passwordInput: string) {
+  const cleanName = nameInput.trim().toLowerCase();
+  const cleanPassword = passwordInput.trim();
+  return (
+    ANALYST_USERS.find(
+      (item) =>
+        item.name.toLowerCase() === cleanName && item.password === cleanPassword,
+    ) ?? null
+  );
+}
+
+export function findAnalystById(id: string) {
+  return ANALYST_USERS.find((item) => item.id === id) ?? null;
 }
 
 export function normalizeCPF(value: string) {

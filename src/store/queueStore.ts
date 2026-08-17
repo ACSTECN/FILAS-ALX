@@ -2,9 +2,11 @@ import { create } from "zustand";
 import { canUseLocalFallback, supabase } from "@/lib/supabase";
 import { getTodayKey, isExpiredQueueDate } from "@/lib/format";
 import type { QueueFilters, QueueFormValues, QueueRecord } from "@/types/queue";
+import type { AuthUser } from "@/types/auth";
 
 const LOCAL_STORAGE_KEY = "alx-entregas-fila";
 const ANALYST_STORAGE_KEY = "alx-entregas-analista";
+const AUTH_STORAGE_KEY = "alx-auth-session";
 
 const defaultFilters: QueueFilters = {
   cidade: "Todas",
@@ -32,10 +34,26 @@ type QueueStore = {
   replaceQueue: (records: QueueRecord[]) => void;
 };
 
+function readAuthUser(): AuthUser | null {
+  if (typeof window === "undefined") return null;
+  const raw = window.localStorage.getItem(AUTH_STORAGE_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as AuthUser;
+    if (parsed?.role !== "operacional") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 function readLocalAnalyst() {
   if (typeof window === "undefined") {
     return "";
   }
+
+  const auth = readAuthUser();
+  if (auth?.analystName) return auth.analystName;
 
   return window.localStorage.getItem(ANALYST_STORAGE_KEY) ?? "";
 }
@@ -44,6 +62,13 @@ function writeLocalAnalyst(value: string) {
   if (typeof window !== "undefined") {
     window.localStorage.setItem(ANALYST_STORAGE_KEY, value);
   }
+}
+
+function resolveCurrentAnalystName(): string | null {
+  const auth = readAuthUser();
+  if (auth?.analystName?.trim()) return auth.analystName.trim();
+  const local = readLocalAnalyst();
+  return local ? local.trim() : null;
 }
 
 function readLocalQueue() {
@@ -265,7 +290,7 @@ export const useQueueStore = create<QueueStore>((set) => ({
   createRecord: async (values) => {
     set({ syncing: true, error: null });
 
-    const analystName = useQueueStore.getState().analystName.trim();
+    const currentAnalyst = resolveCurrentAnalystName();
     const { tipo_atribuicao, ...payload } = values;
 
     const origem = payload.origem ?? "operacional";
@@ -283,7 +308,10 @@ export const useQueueStore = create<QueueStore>((set) => ({
           ? "na_fila_entregador"
           : "na_fila_fila";
 
-    const analista = origem === "entregador" ? null : analystName ? analystName : null;
+    const analista =
+      origem === "entregador"
+        ? null
+        : currentAnalyst ?? null;
 
     const insertPayload = {
       ...payload,
@@ -348,12 +376,21 @@ export const useQueueStore = create<QueueStore>((set) => ({
       const status = current
         ? deriveNextStatus(current.status, "retirado")
         : "retirado_fila";
-      const analystName = useQueueStore.getState().analystName.trim();
+
+      const currentAnalyst = resolveCurrentAnalystName();
+      const tipo = normalizeTipo(current?.tipo, current?.status);
+      const origem = normalizeOrigem(current?.origem);
+      const isEntregadorFlow = origem === "entregador" || tipo === "ENTREGADOR";
+
+      const analystUpdate = isEntregadorFlow
+        ? currentAnalyst ?? current?.analista ?? null
+        : current?.analista ?? currentAnalyst ?? null;
+
       const { error } = await supabase
         .from("fila_registros")
         .update({
           status,
-          analista: analystName ? analystName : null,
+          analista: analystUpdate,
         } as never)
         .eq("id", id);
 
@@ -379,14 +416,23 @@ export const useQueueStore = create<QueueStore>((set) => ({
     const status = current
       ? deriveNextStatus(current.status, "retirado")
       : "retirado_fila";
-    const analystName = useQueueStore.getState().analystName.trim();
+
+    const currentAnalyst = resolveCurrentAnalystName();
+    const tipo = normalizeTipo(current?.tipo, current?.status);
+    const origem = normalizeOrigem(current?.origem);
+    const isEntregadorFlow = origem === "entregador" || tipo === "ENTREGADOR";
+
+    const analystUpdate = isEntregadorFlow
+      ? currentAnalyst ?? current?.analista ?? null
+      : current?.analista ?? currentAnalyst ?? null;
+
     const nextQueue = normalizeQueue(
       useQueueStore.getState().queue.map((record) =>
         record.id === id
           ? {
               ...record,
               status,
-              analista: analystName ? analystName : null,
+              analista: analystUpdate,
             }
           : record,
       ),
@@ -402,9 +448,19 @@ export const useQueueStore = create<QueueStore>((set) => ({
       const status = current
         ? deriveNextStatus(current.status, "atribuido")
         : "atribuido_fila";
+
+      const currentAnalyst = resolveCurrentAnalystName();
+      const tipo = normalizeTipo(current?.tipo, current?.status);
+      const origem = normalizeOrigem(current?.origem);
+      const isEntregadorFlow = origem === "entregador" || tipo === "ENTREGADOR";
+
+      const analista = isEntregadorFlow
+        ? currentAnalyst ?? current?.analista ?? null
+        : current?.analista ?? currentAnalyst ?? null;
+
       const { error } = await supabase
         .from("fila_registros")
-        .update({ status } as never)
+        .update({ status, analista } as never)
         .eq("id", id);
 
       if (error) {
@@ -429,12 +485,23 @@ export const useQueueStore = create<QueueStore>((set) => ({
     const status = current
       ? deriveNextStatus(current.status, "atribuido")
       : "atribuido_fila";
+
+    const currentAnalyst = resolveCurrentAnalystName();
+    const tipo = normalizeTipo(current?.tipo, current?.status);
+    const origem = normalizeOrigem(current?.origem);
+    const isEntregadorFlow = origem === "entregador" || tipo === "ENTREGADOR";
+
+    const analista = isEntregadorFlow
+      ? currentAnalyst ?? current?.analista ?? null
+      : current?.analista ?? currentAnalyst ?? null;
+
     const nextQueue = normalizeQueue(
       useQueueStore.getState().queue.map((record) =>
         record.id === id
           ? {
               ...record,
               status,
+              analista,
             }
           : record,
       ),

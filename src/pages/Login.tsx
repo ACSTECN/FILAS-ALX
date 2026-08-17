@@ -1,7 +1,8 @@
 import { FormEvent, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
-import { RadioTower, LogIn } from "lucide-react";
+import { RadioTower, LogIn, UserRound } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
+import { ANALYST_USERS } from "@/types/auth";
 
 export default function Login() {
   const location = useLocation();
@@ -10,6 +11,7 @@ export default function Login() {
   const loginError = useAuthStore((state) => state.loginError);
   const loginOperacional = useAuthStore((state) => state.loginOperacional);
 
+  const [analystName, setAnalystName] = useState<string>("");
   const [password, setPassword] = useState("");
 
   const from =
@@ -26,7 +28,7 @@ export default function Login() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const ok = loginOperacional(password);
+    const ok = loginOperacional(analystName, password);
     if (!ok) return;
     navigate(from ?? "/", { replace: true });
   };
@@ -57,22 +59,46 @@ export default function Login() {
             ALX Filas - Painel operacional
           </h1>
           <p className="mt-3 text-sm leading-7 text-slate-300">
-            Entrada exclusiva para a equipe de operacao. Entregadores utilizam o link
-            separado.
+            Entrada exclusiva para analistas. Cada usuario acompanha suas proprias
+            atribuicoes no ranking.
           </p>
 
           <form
             onSubmit={handleSubmit}
             className="mt-8 space-y-5 rounded-[28px] border border-white/10 bg-white/[0.04] p-6 backdrop-blur"
           >
-            <input type="hidden" name="mode" value="operacional" />
             <label className="block space-y-2 text-sm text-slate-300">
-              <span>Senha operacional</span>
+              <span className="inline-flex items-center gap-2">
+                <UserRound className="h-3.5 w-3.5 text-[#38bdf8]" />
+                Analista
+              </span>
+              <select
+                value={analystName}
+                onChange={(event) => setAnalystName(event.target.value)}
+                className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none transition focus:border-[#38bdf8]/60"
+              >
+                <option value="" className="bg-slate-950 text-slate-300">
+                  Selecione seu nome
+                </option>
+                {ANALYST_USERS.map((analyst) => (
+                  <option
+                    key={analyst.id}
+                    value={analyst.name}
+                    className="bg-slate-950 text-white"
+                  >
+                    {analyst.initials} · {analyst.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block space-y-2 text-sm text-slate-300">
+              <span>Senha</span>
               <input
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                placeholder="Digite a senha da operacao"
+                placeholder="Digite sua senha de analista"
                 className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-[#38bdf8]/60"
               />
             </label>
@@ -88,7 +114,7 @@ export default function Login() {
               className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#2563eb] via-[#38bdf8] to-[#f97316] px-5 py-4 text-sm font-semibold text-slate-950 shadow-[0_20px_60px_rgba(37,99,235,0.28)] transition hover:-translate-y-0.5 hover:brightness-110"
             >
               <LogIn className="h-4 w-4" />
-              Entrar
+              Entrar como analista
             </button>
           </form>
         </div>

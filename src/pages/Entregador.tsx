@@ -43,6 +43,20 @@ export default function EntregadorPage() {
 
   const cityHotzones = useMemo(() => hotzonesByCity[cidade], [cidade]);
 
+  const turnoOptions = useMemo<Shift[]>(() => {
+    const base: Shift[] = ["Manhã", "Tarde", "Noite"];
+    if (cidade === "Rio de Janeiro") {
+      base.push("Ceia");
+    }
+    return base;
+  }, [cidade]);
+
+  useEffect(() => {
+    if (!turnoOptions.includes(turno)) {
+      setTurno(turnoOptions[0] ?? "Manhã");
+    }
+  }, [turnoOptions, turno]);
+
   useEffect(() => {
     if (location.pathname !== "/entregador") {
       navigate("/entregador", { replace: true });
@@ -242,7 +256,7 @@ export default function EntregadorPage() {
                     onChange={(event) => setTurno(event.target.value as Shift)}
                     className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none"
                   >
-                    {shiftOptions.map((item) => (
+                    {turnoOptions.map((item) => (
                       <option key={item} value={item} className="bg-slate-950 text-white">
                         {item}
                       </option>

@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AlertTriangle, CalendarCheck, LoaderCircle, ShieldCheck } from "lucide-react";
-import { hotzonesByCity, shiftOptions } from "@/data/hotzones";
+import { hotzonesByCity } from "@/data/hotzones";
 import { useQueueStore } from "@/store/queueStore";
 import type { City, Hotzone, QueueFormValues, Shift } from "@/types/queue";
 import { formatCPF, isValidCPF, normalizeCPF } from "@/types/auth";

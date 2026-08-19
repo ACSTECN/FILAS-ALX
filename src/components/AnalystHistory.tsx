@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { History, MapPin, UsersRound } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { useAuthStore } from "@/store/authStore";
 import type { City, QueueRecord } from "@/types/queue";
 import type { UnifiedItemKind } from "@/types/unified";
 import { ANALYST_USERS, formatCPF } from "@/types/auth";
@@ -31,9 +32,22 @@ function yearOptions() {
   return [current - 1, current, current + 1].map((value) => String(value));
 }
 
-function getMonthRange(year: string, month: string) {
+function pad(n: number) {
+  return String(n).padStart(2, "0");
+}
+
+function todayISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function buildDateFilter(year: string, month: string, day: string) {
+  if (day !== "all") {
+    return { type: "eq", value: day } as const;
+  }
+
   if (month === "all") {
-    return null;
+    return { type: "year", value: year } as const;
   }
 
   const start = `${year}-${month}-01`;
@@ -42,7 +56,7 @@ function getMonthRange(year: string, month: string) {
   endDate.setMonth(endDate.getMonth() + 1);
   const end = endDate.toLocaleDateString("en-CA");
 
-  return { start, end };
+  return { type: "range", start, end } as const;
 }
 
 function tipoLabel(tipo: string) {
@@ -71,23 +85,24 @@ function sortByLatest(list: QueueRecord[]) {
 }
 
 export function AnalystHistory() {
+  const user = useAuthStore((state) => state.user);
   const today = new Date();
-  const [analystId, setAnalystId] = useState<string>(ANALYST_USERS[0]?.id ?? "");
   const [city, setCity] = useState<CityFilter>("Todas");
   const [kind, setKind] = useState<KindFilter>("Todas");
   const [month, setMonth] = useState(() => String(today.getMonth() + 1).padStart(2, "0"));
   const [year, setYear] = useState(() => String(today.getFullYear()));
+  const [day, setDay] = useState<string>("all");
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<QueueRecord[]>([]);
 
   const selectedAnalyst = useMemo(
-    () => ANALYST_USERS.find((item) => item.id === analystId) ?? null,
-    [analystId],
+    () => ANALYST_USERS.find((item) => item.id === user?.analystId) ?? null,
+    [user],
   );
 
-  const loadHistory = async () => {
+  const loadHistory = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -101,10 +116,11 @@ export function AnalystHistory() {
     if (!selectedAnalyst) {
       setRows([]);
       setLoading(false);
+      setError("Voce precisa estar logado como analista para ver o historico.");
       return;
     }
 
-    const range = getMonthRange(year, month);
+    const dateFilter = buildDateFilter(year, month, day);
 
     let query = supabase
       .from("fila_registros")
@@ -131,8 +147,12 @@ export function AnalystHistory() {
       query = query.in("status", ["atribuido_entregador", "retirado_entregador"]);
     }
 
-    if (range) {
-      query = query.gte("data_fila", range.start).lt("data_fila", range.end);
+    if (dateFilter.type === "range") {
+      query = query.gte("data_fila", dateFilter.start).lt("data_fila", dateFilter.end);
+    } else if (dateFilter.type === "year") {
+      query = query.gte("data_fila", `${dateFilter.value}-01-01`).lt("data_fila", `${Number(dateFilter.value) + 1}-01-01`);
+    } else if (dateFilter.type === "eq") {
+      query = query.eq("data_fila", dateFilter.value);
     }
 
     const { data, error } = await query.order("criado_em", { ascending: false });
@@ -145,11 +165,11 @@ export function AnalystHistory() {
 
     setRows(sortByLatest((data ?? []) as QueueRecord[]));
     setLoading(false);
-  };
+  }, [selectedAnalyst, city, kind, month, year, day]);
 
   useEffect(() => {
     void loadHistory();
-  }, [analystId, city, kind, month, year]);
+  }, [loadHistory]);
 
   useEffect(() => {
     if (!supabase) {
@@ -170,7 +190,7 @@ export function AnalystHistory() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [analystId, city, kind, month, year]);
+  }, [loadHistory]);
 
   const totalRegistros = rows.length;
   const totalAtribuidos = rows.filter((item) => item.status.startsWith("atribuido_")).length;
@@ -185,25 +205,16 @@ export function AnalystHistory() {
               Historico
             </p>
             <h2 className="mt-2 text-2xl font-semibold text-white">
-              Atribuicoes por analista
+              Meu historico de atribuicoes
             </h2>
             <p className="mt-2 text-sm text-slate-400">
-              Veja tudo o que cada analista gerou, com filtros por cidade, tipo e periodo.
+              {selectedAnalyst
+                ? `${selectedAnalyst.name} · Somente os seus registros aparecem aqui.`
+                : "Historico pessoal por analista."}
             </p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            <select
-              value={analystId}
-              onChange={(event) => setAnalystId(event.target.value)}
-              className="alx-field rounded-2xl border border-white/10 px-4 py-3 text-sm text-white outline-none"
-            >
-              {ANALYST_USERS.map((item) => (
-                <option key={item.id} value={item.id} className="bg-slate-950 text-white">
-                  {item.initials} · {item.name}
-                </option>
-              ))}
-            </select>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
             <select
               value={city}
               onChange={(event) => setCity(event.target.value as CityFilter)}
@@ -237,6 +248,31 @@ export function AnalystHistory() {
                 Entregador
               </option>
             </select>
+            <select
+              value={day}
+              onChange={(event) => setDay(event.target.value)}
+              className="alx-field rounded-2xl border border-white/10 px-4 py-3 text-sm text-white outline-none"
+            >
+              <option value="all" className="bg-slate-950 text-white">
+                Todos os dias
+              </option>
+              <option value={todayISO()} className="bg-slate-950 text-white">
+                Hoje
+              </option>
+              <optgroup label="Datas filtradas" className="bg-slate-950 text-white">
+                <option value={todayISO()} className="bg-slate-950 text-white">
+                  {new Date().toLocaleDateString("pt-BR")}
+                </option>
+              </optgroup>
+            </select>
+            <input
+              type="date"
+              value={day === "all" ? "" : day}
+              onChange={(event) => {
+                setDay(event.target.value || "all");
+              }}
+              className="alx-field rounded-2xl border border-white/10 px-4 py-3 text-sm text-white outline-none [color-scheme:dark]"
+            />
             <select
               value={month}
               onChange={(event) => setMonth(event.target.value)}
@@ -302,7 +338,7 @@ export function AnalystHistory() {
 
       <div className="alx-card rounded-[32px] border border-white/10 p-6 backdrop-blur">
         <div className="mb-5 flex items-center justify-between">
-          <p className="text-sm font-semibold text-white">Registros do analista</p>
+          <p className="text-sm font-semibold text-white">Meus registros</p>
           <p className="text-sm text-slate-400">
             {loading ? "Carregando..." : `${rows.length} registros`}
           </p>
@@ -316,7 +352,7 @@ export function AnalystHistory() {
           <div className="rounded-[28px] border border-dashed border-white/10 bg-white/5 p-8 text-center">
             <p className="text-lg font-medium text-white">Sem registros</p>
             <p className="mt-2 text-sm text-slate-400">
-              Ainda nao houve atribuicoes para esse analista nos filtros selecionados.
+              Ainda nao houve atribuicoes nos filtros selecionados.
             </p>
           </div>
         ) : (

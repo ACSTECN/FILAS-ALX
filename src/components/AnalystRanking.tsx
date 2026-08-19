@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Crown, Sparkles, UsersRound } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { City } from "@/types/queue";
@@ -47,9 +47,22 @@ function yearOptions() {
   return [current - 1, current, current + 1].map((value) => String(value));
 }
 
-function getMonthRange(year: string, month: string) {
+function pad(n: number) {
+  return String(n).padStart(2, "0");
+}
+
+function todayISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function buildDateFilter(year: string, month: string, day: string) {
+  if (day !== "all") {
+    return { type: "eq", value: day } as const;
+  }
+
   if (month === "all") {
-    return null;
+    return { type: "year", value: year } as const;
   }
 
   const start = `${year}-${month}-01`;
@@ -58,7 +71,7 @@ function getMonthRange(year: string, month: string) {
   endDate.setMonth(endDate.getMonth() + 1);
   const end = endDate.toLocaleDateString("en-CA");
 
-  return { start, end };
+  return { type: "range", start, end } as const;
 }
 
 function buildRankingRows(counts: Map<string, number>): RankingRow[] {
@@ -93,16 +106,19 @@ function buildRankingRows(counts: Map<string, number>): RankingRow[] {
   return rows.sort((a, b) => b.total - a.total || a.analista.localeCompare(b.analista));
 }
 
+const STATUS_TODOS = ["atribuido_fila", "atribuido_tpr", "atribuido_entregador"] as const;
+
 export function AnalystRanking() {
   const [city, setCity] = useState<City | "Todas">("Todas");
   const [kind, setKind] = useState<UnifiedItemKind | "Todas">("Todas");
   const [month, setMonth] = useState(() => new Date().toLocaleDateString("en-CA").slice(5, 7));
   const [year, setYear] = useState(() => String(new Date().getFullYear()));
+  const [day, setDay] = useState<string>("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<RankingRow[]>(() => buildRankingRows(new Map()));
 
-  const loadRanking = async () => {
+  const loadRanking = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -113,34 +129,33 @@ export function AnalystRanking() {
       return;
     }
 
-    const range = getMonthRange(year, month);
+    const dateFilter = buildDateFilter(year, month, day);
+
+    const statusList =
+      kind === "FILA"
+        ? ["atribuido_fila"]
+        : kind === "TPR"
+        ? ["atribuido_tpr"]
+        : kind === "ENTREGADOR"
+        ? ["atribuido_entregador"]
+        : STATUS_TODOS;
 
     let query = supabase
       .from("fila_registros")
-      .select("analista,data_fila,cidade")
-      .not("analista", "is", null);
-
-    if (kind === "FILA") {
-      query = query.in("status", ["atribuido_fila", "atribuido"]);
-    } else if (kind === "TPR") {
-      query = query.in("status", ["atribuido_tpr"]);
-    } else if (kind === "ENTREGADOR") {
-      query = query.in("status", ["atribuido_entregador"]);
-    } else {
-      query = query.in("status", [
-        "atribuido_fila",
-        "atribuido_tpr",
-        "atribuido_entregador",
-        "atribuido",
-      ]);
-    }
+      .select("analista")
+      .not("analista", "is", null)
+      .in("status", statusList);
 
     if (city !== "Todas") {
       query = query.eq("cidade", city);
     }
 
-    if (range) {
-      query = query.gte("data_fila", range.start).lt("data_fila", range.end);
+    if (dateFilter.type === "range") {
+      query = query.gte("data_fila", dateFilter.start).lt("data_fila", dateFilter.end);
+    } else if (dateFilter.type === "year") {
+      query = query.gte("data_fila", `${dateFilter.value}-01-01`).lt("data_fila", `${Number(dateFilter.value) + 1}-01-01`);
+    } else if (dateFilter.type === "eq") {
+      query = query.eq("data_fila", dateFilter.value);
     }
 
     const { data, error } = await query;
@@ -160,15 +175,13 @@ export function AnalystRanking() {
       counts.set(name, (counts.get(name) ?? 0) + 1);
     });
 
-    const nextRows = buildRankingRows(counts);
-
-    setRows(nextRows);
+    setRows(buildRankingRows(counts));
     setLoading(false);
-  };
+  }, [city, kind, month, year, day]);
 
   useEffect(() => {
     void loadRanking();
-  }, [city, kind, month, year]);
+  }, [loadRanking]);
 
   useEffect(() => {
     if (!supabase) {
@@ -189,7 +202,7 @@ export function AnalystRanking() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [city, kind, month, year]);
+  }, [loadRanking]);
 
   const totalAtribuidos = useMemo(
     () => rows.reduce((sum, row) => sum + row.total, 0),
@@ -216,7 +229,7 @@ export function AnalystRanking() {
             </p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <select
               value={city}
               onChange={(event) => setCity(event.target.value as City | "Todas")}
@@ -251,28 +264,54 @@ export function AnalystRanking() {
               </option>
             </select>
             <select
-              value={month}
-              onChange={(event) => setMonth(event.target.value)}
+              value={day}
+              onChange={(event) => setDay(event.target.value)}
               className="alx-field rounded-2xl border border-white/10 px-4 py-3 text-sm text-white outline-none"
             >
-              {monthOptions().map((opt) => (
-                <option key={opt.value} value={opt.value} className="bg-slate-950 text-white">
-                  {opt.label}
+              <option value="all" className="bg-slate-950 text-white">
+                Todos os dias
+              </option>
+              <option value={todayISO()} className="bg-slate-950 text-white">
+                Hoje
+              </option>
+              <optgroup label="Datas filtradas" className="bg-slate-950 text-white">
+                <option value={todayISO()} className="bg-slate-950 text-white">
+                  {new Date().toLocaleDateString("pt-BR")}
                 </option>
-              ))}
+              </optgroup>
             </select>
-
-            <select
-              value={year}
-              onChange={(event) => setYear(event.target.value)}
-              className="alx-field rounded-2xl border border-white/10 px-4 py-3 text-sm text-white outline-none"
-            >
-              {yearOptions().map((value) => (
-                <option key={value} value={value} className="bg-slate-950 text-white">
-                  {value}
-                </option>
-              ))}
-            </select>
+            <input
+              type="date"
+              value={day === "all" ? "" : day}
+              onChange={(event) => {
+                setDay(event.target.value || "all");
+              }}
+              className="alx-field rounded-2xl border border-white/10 px-4 py-3 text-sm text-white outline-none [color-scheme:dark]"
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <select
+                value={month}
+                onChange={(event) => setMonth(event.target.value)}
+                className="alx-field rounded-2xl border border-white/10 px-4 py-3 text-sm text-white outline-none"
+              >
+                {monthOptions().map((opt) => (
+                  <option key={opt.value} value={opt.value} className="bg-slate-950 text-white">
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={year}
+                onChange={(event) => setYear(event.target.value)}
+                className="alx-field rounded-2xl border border-white/10 px-4 py-3 text-sm text-white outline-none"
+              >
+                {yearOptions().map((value) => (
+                  <option key={value} value={value} className="bg-slate-950 text-white">
+                    {value}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
       </div>
@@ -519,53 +558,45 @@ export function AnalystRanking() {
               Carregando...
             </div>
           ) : rows.length === 0 ? (
-            <div className="rounded-[28px] border border-dashed border-white/10 bg-white/5 p-8 text-center">
-              <p className="text-lg font-medium text-white">Sem atribuicoes</p>
-              <p className="mt-2 text-sm text-slate-400">
-                Assim que voce usar “Atribuir”, o ranking aparece aqui.
-              </p>
+            <div className="rounded-[24px] border border-dashed border-white/10 bg-white/5 p-6 text-center text-slate-300">
+              Sem dados para os filtros selecionados.
             </div>
           ) : (
-            <div className="grid gap-3">
-              {rows.map((row, index) => {
-                const progress = topValue ? Math.round((row.total / topValue) * 100) : 0;
+            <div className="space-y-3">
+              {rows.map((row, idx) => {
+                const percentage = topValue > 0 ? (row.total / topValue) * 100 : 0;
                 const avatar = colorFromName(row.analista);
-
                 return (
                   <div
                     key={row.analystId}
-                    className="rounded-[24px] border border-white/10 bg-white/5 px-5 py-4"
+                    className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4"
                   >
                     <div className="flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-4">
-                        <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white/5 text-sm font-semibold text-white">
-                          {index + 1}
-                        </span>
-                        <div
-                          className="grid h-10 w-10 place-items-center rounded-full border border-white/10 text-xs font-bold text-white"
-                          style={{
-                            backgroundImage: `linear-gradient(135deg, ${avatar.a}, ${avatar.b})`,
-                          }}
-                        >
+                      <div className="flex items-center gap-3">
+                        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/10 text-sm font-bold text-white" style={{ backgroundImage: `linear-gradient(135deg, ${avatar.a}, ${avatar.b})` }}>
                           {row.initials}
                         </div>
                         <div>
                           <p className="text-sm font-semibold text-white uppercase tracking-wide">
                             {row.analista}
                           </p>
-                          <p className="mt-1 text-xs text-slate-400">Analista</p>
+                          <p className="text-xs text-slate-400">Analista</p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-lg font-semibold text-white">{row.total}</p>
-                        <p className="mt-1 text-xs text-slate-400">{progress}% do top</p>
+                        <p className="text-lg font-semibold text-white">#{idx + 1}</p>
+                        <p className="text-xs text-slate-400">
+                          {row.total} · {topValue > 0 ? Math.round(percentage) : 0}% do top
+                        </p>
                       </div>
                     </div>
-
-                    <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-white/5">
+                    <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-white/5">
                       <div
-                        className="h-full rounded-full bg-gradient-to-r from-[#2563eb] via-[#38bdf8] to-[#f97316]"
-                        style={{ width: `${Math.min(100, progress)}%` }}
+                        className="h-full rounded-full transition-[width] duration-700"
+                        style={{
+                          width: `${percentage}%`,
+                          backgroundImage: `linear-gradient(90deg, ${avatar.a}, ${avatar.b})`,
+                        }}
                       />
                     </div>
                   </div>

@@ -89,7 +89,7 @@ export function AnalystHistory() {
   const today = new Date();
   const [city, setCity] = useState<CityFilter>("Todas");
   const [kind, setKind] = useState<KindFilter>("Todas");
-  const [month, setMonth] = useState(() => String(today.getMonth() + 1).padStart(2, "0"));
+  const [month, setMonth] = useState<string>("all");
   const [year, setYear] = useState(() => String(today.getFullYear()));
   const [day, setDay] = useState<string>("all");
 

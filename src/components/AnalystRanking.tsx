@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Crown, Sparkles, UsersRound } from "lucide-react";
+import { Crown, History, Sparkles, UsersRound, MapPin } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { ANALYST_USERS, type AnalystUser } from "@/types/auth";
 
 type RankingRow = {
   analista: string;
+  totalAtribuidos: number;
+  totalRetirados: number;
   total: number;
   initials: string;
   analystId: string;
@@ -22,31 +24,52 @@ function colorFromName(name: string) {
   };
 }
 
-function buildRankingRows(counts: Map<string, number>): RankingRow[] {
-  const normalized = new Map<string, number>();
-  for (const [name, value] of counts.entries()) {
+const STATUS_ATRIBUIDOS = ["atribuido_fila", "atribuido_tpr", "atribuido_entregador"] as const;
+const STATUS_RETIRADOS = ["retirado_fila", "retirado_tpr", "retirado_entregador"] as const;
+
+function buildRankingRows(
+  countsAtribuidos: Map<string, number>,
+  countsRetirados: Map<string, number>,
+): RankingRow[] {
+  const normalizedA = new Map<string, number>();
+  const normalizedR = new Map<string, number>();
+
+  for (const [name, value] of countsAtribuidos.entries()) {
     const key = name.toLowerCase();
-    normalized.set(key, (normalized.get(key) ?? 0) + value);
+    normalizedA.set(key, (normalizedA.get(key) ?? 0) + value);
+  }
+  for (const [name, value] of countsRetirados.entries()) {
+    const key = name.toLowerCase();
+    normalizedR.set(key, (normalizedR.get(key) ?? 0) + value);
   }
 
   const rows = ANALYST_USERS.map((analyst: AnalystUser) => {
-    const total = normalized.get(analyst.name.toLowerCase()) ?? 0;
+    const key = analyst.name.toLowerCase();
+    const totalAtribuidos = normalizedA.get(key) ?? 0;
+    const totalRetirados = normalizedR.get(key) ?? 0;
     return {
       analista: analyst.name,
       initials: analyst.initials,
       analystId: analyst.id,
-      total,
+      totalAtribuidos,
+      totalRetirados,
+      total: totalAtribuidos + totalRetirados,
     };
   });
 
-  for (const [name, total] of normalized.entries()) {
+  const allKeys = new Set([...normalizedA.keys(), ...normalizedR.keys()]);
+  for (const name of allKeys) {
     const exists = ANALYST_USERS.some((item) => item.name.toLowerCase() === name);
     if (!exists) {
+      const totalAtribuidos = normalizedA.get(name) ?? 0;
+      const totalRetirados = normalizedR.get(name) ?? 0;
       rows.push({
         analista: name,
         initials: name.slice(0, 1).toUpperCase() || "?",
         analystId: `ext-${name}`,
-        total,
+        totalAtribuidos,
+        totalRetirados,
+        total: totalAtribuidos + totalRetirados,
       });
     }
   }
@@ -54,48 +77,59 @@ function buildRankingRows(counts: Map<string, number>): RankingRow[] {
   return rows.sort((a, b) => b.total - a.total || a.analista.localeCompare(b.analista));
 }
 
-const STATUS_TODOS = ["atribuido_fila", "atribuido_tpr", "atribuido_entregador"] as const;
-
 export function AnalystRanking() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [rows, setRows] = useState<RankingRow[]>(() => buildRankingRows(new Map()));
+  const [rows, setRows] = useState<RankingRow[]>(() =>
+    buildRankingRows(new Map(), new Map()),
+  );
 
   const loadRanking = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     if (!supabase) {
-      setRows(buildRankingRows(new Map()));
+      setRows(buildRankingRows(new Map(), new Map()));
       setLoading(false);
       setError("Supabase nao configurado neste deploy.");
       return;
     }
 
-    const query = supabase
-      .from("fila_registros")
-      .select("analista")
-      .not("analista", "is", null)
-      .in("status", STATUS_TODOS);
+    const [atribuidosRes, retiradosRes] = await Promise.all([
+      supabase
+        .from("fila_registros")
+        .select("analista")
+        .not("analista", "is", null)
+        .in("status", STATUS_ATRIBUIDOS as unknown as string[]),
+      supabase
+        .from("fila_registros")
+        .select("analista")
+        .not("analista", "is", null)
+        .in("status", STATUS_RETIRADOS as unknown as string[]),
+    ]);
 
-    const { data, error } = await query;
-
-    if (error) {
+    if (atribuidosRes.error || retiradosRes.error) {
       setLoading(false);
       setError("Nao foi possivel carregar o ranking.");
       return;
     }
 
-    const counts = new Map<string, number>();
-    (data ?? []).forEach((item) => {
+    type RowA = { analista: string | null };
+    const countsA = new Map<string, number>();
+    ((atribuidosRes.data ?? []) as RowA[]).forEach((item) => {
       const name = String(item.analista ?? "").trim();
-      if (!name) {
-        return;
-      }
-      counts.set(name, (counts.get(name) ?? 0) + 1);
+      if (!name) return;
+      countsA.set(name, (countsA.get(name) ?? 0) + 1);
     });
 
-    setRows(buildRankingRows(counts));
+    const countsR = new Map<string, number>();
+    ((retiradosRes.data ?? []) as RowA[]).forEach((item) => {
+      const name = String(item.analista ?? "").trim();
+      if (!name) return;
+      countsR.set(name, (countsR.get(name) ?? 0) + 1);
+    });
+
+    setRows(buildRankingRows(countsA, countsR));
     setLoading(false);
   }, []);
 
@@ -125,12 +159,17 @@ export function AnalystRanking() {
   }, [loadRanking]);
 
   const totalAtribuidos = useMemo(
-    () => rows.reduce((sum, row) => sum + row.total, 0),
+    () => rows.reduce((sum, row) => sum + row.totalAtribuidos, 0),
     [rows],
   );
+  const totalRetirados = useMemo(
+    () => rows.reduce((sum, row) => sum + row.totalRetirados, 0),
+    [rows],
+  );
+  const totalGeral = totalAtribuidos + totalRetirados;
 
   const top3 = rows.slice(0, 3);
-  const topValue = top3[0]?.total ?? 0;
+  const topValue = top3[0]?.totalAtribuidos ?? 0;
 
   return (
     <section className="space-y-6">
@@ -144,8 +183,9 @@ export function AnalystRanking() {
               Analistas com mais entregadores atribuidos
             </h2>
             <p className="mt-2 text-sm text-slate-400">
-              Total acumulado de todas as atribuicoes (FILA, TPR e Entregador). FILA / TPR
-              contam para quem registrou a entrada; Entregador conta para quem atribuir o interesse.
+              Total acumulado de todas as atribuicoes e retiradas (FILA, TPR e Entregador).
+              FILA / TPR contam para quem registrou a entrada; Entregador conta para quem
+              atribuir o interesse.
             </p>
           </div>
         </div>
@@ -157,34 +197,52 @@ export function AnalystRanking() {
         </div>
       ) : null}
 
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="alx-card rounded-[28px] border border-white/10 p-5 backdrop-blur">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-slate-300">Total historico</p>
+            <History className="h-5 w-5 text-[#a78bfa]" />
+          </div>
+          <p className="mt-5 text-3xl font-semibold text-white">{totalGeral}</p>
+          <p className="mt-2 text-sm text-slate-400">Atribuidos + retirados (todos tempos)</p>
+        </div>
+
+        <div className="alx-card rounded-[28px] border border-white/10 p-5 backdrop-blur">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-slate-300">Atribuidos</p>
+            <UsersRound className="h-5 w-5 text-[#38bdf8]" />
+          </div>
+          <p className="mt-5 text-3xl font-semibold text-white">{totalAtribuidos}</p>
+          <p className="mt-2 text-sm text-slate-400">Status atual como Atribuido</p>
+        </div>
+
+        <div className="alx-card rounded-[28px] border border-white/10 p-5 backdrop-blur">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-slate-300">Retirados / concluidos</p>
+            <MapPin className="h-5 w-5 text-[#f97316]" />
+          </div>
+          <p className="mt-5 text-3xl font-semibold text-white">{totalRetirados}</p>
+          <p className="mt-2 text-sm text-slate-400">Status atual como Retirado</p>
+        </div>
+      </div>
+
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <div className="space-y-6">
-          <div className="grid gap-4 lg:grid-cols-3">
-            <div className="alx-card rounded-[28px] border border-white/10 p-5 backdrop-blur">
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-slate-300">Total geral atribuidos</p>
-                <UsersRound className="h-5 w-5 text-[#38bdf8]" />
-              </div>
-              <p className="mt-5 text-3xl font-semibold text-white">{totalAtribuidos}</p>
-              <p className="mt-2 text-sm text-slate-400">Acumulado de todas as atribuicoes</p>
+          <div className="alx-card rounded-[28px] border border-white/10 p-5 backdrop-blur">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-slate-300">Top 3</p>
+              <Sparkles className="h-5 w-5 text-[#f97316]" />
             </div>
-
-            <div className="alx-card rounded-[28px] border border-white/10 p-5 backdrop-blur lg:col-span-2">
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-slate-300">Top 3</p>
-                <Sparkles className="h-5 w-5 text-[#f97316]" />
-              </div>
-              <p className="mt-5 text-2xl font-semibold text-white">
-                {top3.some((row) => row.total > 0)
-                  ? "Podio de atribuicoes"
-                  : "Sem dados"}
-              </p>
-              <p className="mt-2 text-sm text-slate-400">
-                {top3.some((row) => row.total > 0)
-                  ? "Os 3 analistas com maior total acumulado."
-                  : "Ainda nao houve atribuicoes"}
-              </p>
-            </div>
+            <p className="mt-5 text-2xl font-semibold text-white">
+              {top3.some((row) => row.totalAtribuidos > 0)
+                ? "Podio de atribuicoes"
+                : "Sem dados"}
+            </p>
+            <p className="mt-2 text-sm text-slate-400">
+              {top3.some((row) => row.totalAtribuidos > 0)
+                ? "Os 3 analistas com maior total acumulado."
+                : "Ainda nao houve atribuicoes"}
+            </p>
           </div>
 
           <div className="alx-card relative overflow-hidden rounded-[36px] border border-white/10 p-6 backdrop-blur">
@@ -208,7 +266,7 @@ export function AnalystRanking() {
               <div className="flex min-h-[420px] items-center justify-center text-slate-300">
                 Carregando ranking...
               </div>
-            ) : !top3.some((row) => row.total > 0) ? (
+            ) : !top3.some((row) => row.totalAtribuidos > 0) ? (
               <div className="rounded-[28px] border border-dashed border-white/10 bg-white/5 p-8 text-center">
                 <p className="text-lg font-medium text-white">Sem atribuicoes</p>
                 <p className="mt-2 text-sm text-slate-400">
@@ -280,8 +338,10 @@ export function AnalystRanking() {
                           </div>
 
                           <div className="mt-6">
-                            <p className="text-3xl font-semibold text-white">{second.total}</p>
-                            <p className="mt-1 text-sm text-slate-400">Atribuicoes</p>
+                            <p className="text-3xl font-semibold text-white">{second.totalAtribuidos}</p>
+                            <p className="mt-1 text-sm text-slate-400">
+                              Atribuidos · {second.totalRetirados} retirados
+                            </p>
                           </div>
                         </div>
                       ) : (
@@ -321,8 +381,10 @@ export function AnalystRanking() {
                         </div>
 
                         <div className="mt-7">
-                          <p className="text-4xl font-semibold text-white">{first.total}</p>
-                          <p className="mt-1 text-sm text-slate-400">Atribuicoes</p>
+                          <p className="text-4xl font-semibold text-white">{first.totalAtribuidos}</p>
+                          <p className="mt-1 text-sm text-slate-400">
+                            Atribuidos · {first.totalRetirados} retirados
+                          </p>
                         </div>
                       </div>
 
@@ -365,8 +427,10 @@ export function AnalystRanking() {
                           </div>
 
                           <div className="mt-6">
-                            <p className="text-3xl font-semibold text-white">{third.total}</p>
-                            <p className="mt-1 text-sm text-slate-400">Atribuicoes</p>
+                            <p className="text-3xl font-semibold text-white">{third.totalAtribuidos}</p>
+                            <p className="mt-1 text-sm text-slate-400">
+                              Atribuidos · {third.totalRetirados} retirados
+                            </p>
                           </div>
                         </div>
                       ) : (
@@ -399,7 +463,7 @@ export function AnalystRanking() {
           ) : (
             <div className="space-y-3">
               {rows.map((row, idx) => {
-                const percentage = topValue > 0 ? (row.total / topValue) * 100 : 0;
+                const percentage = topValue > 0 ? (row.totalAtribuidos / topValue) * 100 : 0;
                 const avatar = colorFromName(row.analista);
                 return (
                   <div
@@ -415,13 +479,15 @@ export function AnalystRanking() {
                           <p className="text-sm font-semibold text-white uppercase tracking-wide">
                             {row.analista}
                           </p>
-                          <p className="text-xs text-slate-400">Analista</p>
+                          <p className="text-xs text-slate-400">
+                            {row.totalAtribuidos} atrib · {row.totalRetirados} retir · {row.total} total
+                          </p>
                         </div>
                       </div>
                       <div className="text-right">
                         <p className="text-lg font-semibold text-white">#{idx + 1}</p>
                         <p className="text-xs text-slate-400">
-                          {row.total} · {topValue > 0 ? Math.round(percentage) : 0}% do top
+                          {row.totalAtribuidos} · {topValue > 0 ? Math.round(percentage) : 0}% do top
                         </p>
                       </div>
                     </div>

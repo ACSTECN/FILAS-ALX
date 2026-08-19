@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Crown, Sparkles, UsersRound } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import type { City } from "@/types/queue";
-import type { UnifiedItemKind } from "@/types/unified";
 import { ANALYST_USERS, type AnalystUser } from "@/types/auth";
 
 type RankingRow = {
@@ -22,56 +20,6 @@ function colorFromName(name: string) {
     a: `hsl(${hash} 85% 60%)`,
     b: `hsl(${(hash + 40) % 360} 85% 55%)`,
   };
-}
-
-function monthOptions() {
-  return [
-    { value: "all", label: "Todos" },
-    { value: "01", label: "Janeiro" },
-    { value: "02", label: "Fevereiro" },
-    { value: "03", label: "Marco" },
-    { value: "04", label: "Abril" },
-    { value: "05", label: "Maio" },
-    { value: "06", label: "Junho" },
-    { value: "07", label: "Julho" },
-    { value: "08", label: "Agosto" },
-    { value: "09", label: "Setembro" },
-    { value: "10", label: "Outubro" },
-    { value: "11", label: "Novembro" },
-    { value: "12", label: "Dezembro" },
-  ];
-}
-
-function yearOptions() {
-  const current = new Date().getFullYear();
-  return [current - 1, current, current + 1].map((value) => String(value));
-}
-
-function pad(n: number) {
-  return String(n).padStart(2, "0");
-}
-
-function todayISO() {
-  const d = new Date();
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-function buildDateFilter(year: string, month: string, day: string) {
-  if (day !== "all") {
-    return { type: "eq", value: day } as const;
-  }
-
-  if (month === "all") {
-    return { type: "year", value: year } as const;
-  }
-
-  const start = `${year}-${month}-01`;
-  const startDate = new Date(`${start}T00:00:00`);
-  const endDate = new Date(startDate);
-  endDate.setMonth(endDate.getMonth() + 1);
-  const end = endDate.toLocaleDateString("en-CA");
-
-  return { type: "range", start, end } as const;
 }
 
 function buildRankingRows(counts: Map<string, number>): RankingRow[] {
@@ -109,11 +57,6 @@ function buildRankingRows(counts: Map<string, number>): RankingRow[] {
 const STATUS_TODOS = ["atribuido_fila", "atribuido_tpr", "atribuido_entregador"] as const;
 
 export function AnalystRanking() {
-  const [city, setCity] = useState<City | "Todas">("Todas");
-  const [kind, setKind] = useState<UnifiedItemKind | "Todas">("Todas");
-  const [month, setMonth] = useState(() => new Date().toLocaleDateString("en-CA").slice(5, 7));
-  const [year, setYear] = useState(() => String(new Date().getFullYear()));
-  const [day, setDay] = useState<string>("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<RankingRow[]>(() => buildRankingRows(new Map()));
@@ -129,34 +72,11 @@ export function AnalystRanking() {
       return;
     }
 
-    const dateFilter = buildDateFilter(year, month, day);
-
-    const statusList =
-      kind === "FILA"
-        ? ["atribuido_fila"]
-        : kind === "TPR"
-        ? ["atribuido_tpr"]
-        : kind === "ENTREGADOR"
-        ? ["atribuido_entregador"]
-        : STATUS_TODOS;
-
-    let query = supabase
+    const query = supabase
       .from("fila_registros")
       .select("analista")
       .not("analista", "is", null)
-      .in("status", statusList);
-
-    if (city !== "Todas") {
-      query = query.eq("cidade", city);
-    }
-
-    if (dateFilter.type === "range") {
-      query = query.gte("data_fila", dateFilter.start).lt("data_fila", dateFilter.end);
-    } else if (dateFilter.type === "year") {
-      query = query.gte("data_fila", `${dateFilter.value}-01-01`).lt("data_fila", `${Number(dateFilter.value) + 1}-01-01`);
-    } else if (dateFilter.type === "eq") {
-      query = query.eq("data_fila", dateFilter.value);
-    }
+      .in("status", STATUS_TODOS);
 
     const { data, error } = await query;
 
@@ -177,7 +97,7 @@ export function AnalystRanking() {
 
     setRows(buildRankingRows(counts));
     setLoading(false);
-  }, [city, kind, month, year, day]);
+  }, []);
 
   useEffect(() => {
     void loadRanking();
@@ -215,103 +135,18 @@ export function AnalystRanking() {
   return (
     <section className="space-y-6">
       <div className="alx-card rounded-[32px] border border-white/10 p-6 backdrop-blur">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.28em] text-slate-500">
-              Ranking
+              Ranking geral
             </p>
             <h2 className="mt-2 text-2xl font-semibold text-white">
               Analistas com mais entregadores atribuidos
             </h2>
             <p className="mt-2 text-sm text-slate-400">
-              FILA / TPR contam para quem registrou a entrada; Entregador conta para quem
-              atribuir o interesse.
+              Total acumulado de todas as atribuicoes (FILA, TPR e Entregador). FILA / TPR
+              contam para quem registrou a entrada; Entregador conta para quem atribuir o interesse.
             </p>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            <select
-              value={city}
-              onChange={(event) => setCity(event.target.value as City | "Todas")}
-              className="alx-field rounded-2xl border border-white/10 px-4 py-3 text-sm text-white outline-none"
-            >
-              <option value="Todas" className="bg-slate-950 text-white">
-                Todas
-              </option>
-              <option value="Rio de Janeiro" className="bg-slate-950 text-white">
-                Rio de Janeiro
-              </option>
-              <option value="São Paulo" className="bg-slate-950 text-white">
-                São Paulo
-              </option>
-            </select>
-            <select
-              value={kind}
-              onChange={(event) => setKind(event.target.value as UnifiedItemKind | "Todas")}
-              className="alx-field rounded-2xl border border-white/10 px-4 py-3 text-sm text-white outline-none"
-            >
-              <option value="Todas" className="bg-slate-950 text-white">
-                Todos os tipos
-              </option>
-              <option value="FILA" className="bg-slate-950 text-white">
-                Fila
-              </option>
-              <option value="TPR" className="bg-slate-950 text-white">
-                TPR
-              </option>
-              <option value="ENTREGADOR" className="bg-slate-950 text-white">
-                Entregador
-              </option>
-            </select>
-            <select
-              value={day}
-              onChange={(event) => setDay(event.target.value)}
-              className="alx-field rounded-2xl border border-white/10 px-4 py-3 text-sm text-white outline-none"
-            >
-              <option value="all" className="bg-slate-950 text-white">
-                Todos os dias
-              </option>
-              <option value={todayISO()} className="bg-slate-950 text-white">
-                Hoje
-              </option>
-              <optgroup label="Datas filtradas" className="bg-slate-950 text-white">
-                <option value={todayISO()} className="bg-slate-950 text-white">
-                  {new Date().toLocaleDateString("pt-BR")}
-                </option>
-              </optgroup>
-            </select>
-            <input
-              type="date"
-              value={day === "all" ? "" : day}
-              onChange={(event) => {
-                setDay(event.target.value || "all");
-              }}
-              className="alx-field rounded-2xl border border-white/10 px-4 py-3 text-sm text-white outline-none [color-scheme:dark]"
-            />
-            <div className="grid grid-cols-2 gap-3">
-              <select
-                value={month}
-                onChange={(event) => setMonth(event.target.value)}
-                className="alx-field rounded-2xl border border-white/10 px-4 py-3 text-sm text-white outline-none"
-              >
-                {monthOptions().map((opt) => (
-                  <option key={opt.value} value={opt.value} className="bg-slate-950 text-white">
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={year}
-                onChange={(event) => setYear(event.target.value)}
-                className="alx-field rounded-2xl border border-white/10 px-4 py-3 text-sm text-white outline-none"
-              >
-                {yearOptions().map((value) => (
-                  <option key={value} value={value} className="bg-slate-950 text-white">
-                    {value}
-                  </option>
-                ))}
-              </select>
-            </div>
           </div>
         </div>
       </div>
@@ -327,11 +162,11 @@ export function AnalystRanking() {
           <div className="grid gap-4 lg:grid-cols-3">
             <div className="alx-card rounded-[28px] border border-white/10 p-5 backdrop-blur">
               <div className="flex items-center justify-between">
-                <p className="text-sm text-slate-300">Total atribuidos</p>
+                <p className="text-sm text-slate-300">Total geral atribuidos</p>
                 <UsersRound className="h-5 w-5 text-[#38bdf8]" />
               </div>
               <p className="mt-5 text-3xl font-semibold text-white">{totalAtribuidos}</p>
-              <p className="mt-2 text-sm text-slate-400">No periodo selecionado</p>
+              <p className="mt-2 text-sm text-slate-400">Acumulado de todas as atribuicoes</p>
             </div>
 
             <div className="alx-card rounded-[28px] border border-white/10 p-5 backdrop-blur lg:col-span-2">
@@ -346,7 +181,7 @@ export function AnalystRanking() {
               </p>
               <p className="mt-2 text-sm text-slate-400">
                 {top3.some((row) => row.total > 0)
-                  ? "Os 3 analistas mais ativos no periodo."
+                  ? "Os 3 analistas com maior total acumulado."
                   : "Ainda nao houve atribuicoes"}
               </p>
             </div>

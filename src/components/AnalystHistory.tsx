@@ -9,6 +9,91 @@ import { ANALYST_USERS, formatCPF } from "@/types/auth";
 type CityFilter = City | "Todas";
 type KindFilter = UnifiedItemKind | "Todas";
 
+const STATUS_ATRIBUIDOS = [
+  "atribuido_fila",
+  "atribuido_tpr",
+  "atribuido_entregador",
+] as const;
+const STATUS_RETIRADOS = [
+  "retirado_fila",
+  "retirado_tpr",
+  "retirado_entregador",
+] as const;
+const STATUS_TODOS_HIST = [...STATUS_ATRIBUIDOS, ...STATUS_RETIRADOS] as const;
+
+type HistorySummary = {
+  total: number;
+  atribuidos: number;
+  retirados: number;
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyFilter = any;
+
+function statusListByKind(kind: KindFilter) {
+  if (kind === "FILA") {
+    return ["atribuido_fila", "retirado_fila"] as const;
+  }
+  if (kind === "TPR") {
+    return ["atribuido_tpr", "retirado_tpr"] as const;
+  }
+  if (kind === "ENTREGADOR") {
+    return ["atribuido_entregador", "retirado_entregador"] as const;
+  }
+  return STATUS_TODOS_HIST;
+}
+
+function buildDateFilter(year: string, month: string, day: string) {
+  if (day !== "all") {
+    return { type: "eq", value: day } as const;
+  }
+  if (year === "all" && month === "all") {
+    return { type: "none" } as const;
+  }
+  if (month === "all") {
+    return { type: "year", value: year } as const;
+  }
+  const start = `${year}-${month}-01`;
+  const startDate = new Date(`${start}T00:00:00`);
+  const endDate = new Date(startDate);
+  endDate.setMonth(endDate.getMonth() + 1);
+  const end = endDate.toLocaleDateString("en-CA");
+  return { type: "range", start, end } as const;
+}
+
+function applyCommonFilters({
+  query,
+  city,
+  kind,
+  dateFilter,
+  statusOverride,
+}: {
+  query: AnyFilter;
+  city: CityFilter;
+  kind: KindFilter;
+  dateFilter: ReturnType<typeof buildDateFilter>;
+  statusOverride?: readonly string[];
+}) {
+  const statuses = statusOverride ?? statusListByKind(kind);
+  query = query.in("status", statuses as unknown as string[]);
+
+  if (city !== "Todas") {
+    query = query.eq("cidade", city);
+  }
+
+  if (dateFilter.type === "range") {
+    query = query.gte("data_fila", dateFilter.start).lt("data_fila", dateFilter.end);
+  } else if (dateFilter.type === "year") {
+    query = query
+      .gte("data_fila", `${dateFilter.value}-01-01`)
+      .lt("data_fila", `${Number(dateFilter.value) + 1}-01-01`);
+  } else if (dateFilter.type === "eq") {
+    query = query.eq("data_fila", dateFilter.value);
+  }
+
+  return query;
+}
+
 function monthOptions() {
   return [
     { value: "all", label: "Todos" },
@@ -39,28 +124,6 @@ function pad(n: number) {
 function todayISO() {
   const d = new Date();
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-function buildDateFilter(year: string, month: string, day: string) {
-  if (day !== "all") {
-    return { type: "eq", value: day } as const;
-  }
-
-  if (year === "all" && month === "all") {
-    return { type: "none" } as const;
-  }
-
-  if (month === "all") {
-    return { type: "year", value: year } as const;
-  }
-
-  const start = `${year}-${month}-01`;
-  const startDate = new Date(`${start}T00:00:00`);
-  const endDate = new Date(startDate);
-  endDate.setMonth(endDate.getMonth() + 1);
-  const end = endDate.toLocaleDateString("en-CA");
-
-  return { type: "range", start, end } as const;
 }
 
 function tipoLabel(tipo: string) {
@@ -99,6 +162,7 @@ export function AnalystHistory() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<QueueRecord[]>([]);
+  const [summary, setSummary] = useState<HistorySummary>({ total: 0, atribuidos: 0, retirados: 0 });
 
   const selectedAnalyst = useMemo(
     () => ANALYST_USERS.find((item) => item.id === user?.analystId) ?? null,
@@ -111,6 +175,7 @@ export function AnalystHistory() {
 
     if (!supabase) {
       setRows([]);
+      setSummary({ total: 0, atribuidos: 0, retirados: 0 });
       setLoading(false);
       setError("Supabase nao configurado neste deploy.");
       return;
@@ -118,6 +183,7 @@ export function AnalystHistory() {
 
     if (!selectedAnalyst) {
       setRows([]);
+      setSummary({ total: 0, atribuidos: 0, retirados: 0 });
       setLoading(false);
       setError("Voce precisa estar logado como analista para ver o historico.");
       return;
@@ -125,48 +191,55 @@ export function AnalystHistory() {
 
     const dateFilter = buildDateFilter(year, month, day);
 
-    let query = supabase
-      .from("fila_registros")
-      .select("*")
-      .ilike("analista", selectedAnalyst.name)
-      .in("status", [
-        "atribuido_fila",
-        "atribuido_tpr",
-        "atribuido_entregador",
-        "retirado_fila",
-        "retirado_tpr",
-        "retirado_entregador",
-      ]);
+    const baseFor = (options: { count?: "exact" | "planned" | "estimated"; head?: boolean } = {}) =>
+      supabase
+        .from("fila_registros")
+        .select("*", options) as AnyFilter;
 
-    if (city !== "Todas") {
-      query = query.eq("cidade", city);
-    }
+    const baseCountAtrib = applyCommonFilters({
+      query: baseFor({ count: "exact", head: true })
+        .not("analista", "is", null)
+        .ilike("analista", selectedAnalyst.name),
+      city,
+      kind,
+      dateFilter,
+      statusOverride: STATUS_ATRIBUIDOS,
+    });
+    const baseCountRetir = applyCommonFilters({
+      query: baseFor({ count: "exact", head: true })
+        .not("analista", "is", null)
+        .ilike("analista", selectedAnalyst.name),
+      city,
+      kind,
+      dateFilter,
+      statusOverride: STATUS_RETIRADOS,
+    });
+    const baseRows = applyCommonFilters({
+      query: baseFor()
+        .not("analista", "is", null)
+        .ilike("analista", selectedAnalyst.name),
+      city,
+      kind,
+      dateFilter,
+    });
 
-    if (kind === "FILA") {
-      query = query.in("status", ["atribuido_fila", "retirado_fila"]);
-    } else if (kind === "TPR") {
-      query = query.in("status", ["atribuido_tpr", "retirado_tpr"]);
-    } else if (kind === "ENTREGADOR") {
-      query = query.in("status", ["atribuido_entregador", "retirado_entregador"]);
-    }
+    const [atribRes, retirRes, rowsRes] = await Promise.all([
+      baseCountAtrib,
+      baseCountRetir,
+      baseRows.order("criado_em", { ascending: false }),
+    ]);
 
-    if (dateFilter.type === "range") {
-      query = query.gte("data_fila", dateFilter.start).lt("data_fila", dateFilter.end);
-    } else if (dateFilter.type === "year") {
-      query = query.gte("data_fila", `${dateFilter.value}-01-01`).lt("data_fila", `${Number(dateFilter.value) + 1}-01-01`);
-    } else if (dateFilter.type === "eq") {
-      query = query.eq("data_fila", dateFilter.value);
-    }
-
-    const { data, error } = await query.order("criado_em", { ascending: false });
-
-    if (error) {
+    if (atribRes.error || retirRes.error || rowsRes.error) {
       setLoading(false);
       setError("Nao foi possivel carregar o historico.");
       return;
     }
 
-    setRows(sortByLatest((data ?? []) as QueueRecord[]));
+    const atribuidos = Number(atribRes.count ?? 0);
+    const retirados = Number(retirRes.count ?? 0);
+
+    setRows(sortByLatest((rowsRes.data ?? []) as QueueRecord[]));
+    setSummary({ total: atribuidos + retirados, atribuidos, retirados });
     setLoading(false);
   }, [selectedAnalyst, city, kind, month, year, day]);
 
@@ -195,9 +268,7 @@ export function AnalystHistory() {
     };
   }, [loadHistory]);
 
-  const totalRegistros = rows.length;
-  const totalAtribuidos = rows.filter((item) => item.status.startsWith("atribuido_")).length;
-  const totalRetirados = rows.filter((item) => item.status.startsWith("retirado_")).length;
+  const { total: totalRegistros, atribuidos: totalAtribuidos, retirados: totalRetirados } = summary;
 
   return (
     <section className="space-y-6">

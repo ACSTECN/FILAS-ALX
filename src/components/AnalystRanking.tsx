@@ -3,6 +3,17 @@ import { Crown, History, Sparkles, UsersRound, MapPin } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { ANALYST_USERS, type AnalystUser } from "@/types/auth";
 
+const STATUS_ATRIBUIDOS = [
+  "atribuido_fila",
+  "atribuido_tpr",
+  "atribuido_entregador",
+] as const;
+const STATUS_RETIRADOS = [
+  "retirado_fila",
+  "retirado_tpr",
+  "retirado_entregador",
+] as const;
+
 type RankingRow = {
   analista: string;
   totalAtribuidos: number;
@@ -24,112 +35,59 @@ function colorFromName(name: string) {
   };
 }
 
-const STATUS_ATRIBUIDOS = ["atribuido_fila", "atribuido_tpr", "atribuido_entregador"] as const;
-const STATUS_RETIRADOS = ["retirado_fila", "retirado_tpr", "retirado_entregador"] as const;
+async function countByAnalyst(analystName: string, statuses: readonly string[]) {
+  if (!supabase) return 0;
+  const { count, error } = await supabase
+    .from("fila_registros")
+    .select("*", { count: "exact", head: true })
+    .not("analista", "is", null)
+    .ilike("analista", analystName)
+    .in("status", statuses as unknown as string[]);
 
-function buildRankingRows(
-  countsAtribuidos: Map<string, number>,
-  countsRetirados: Map<string, number>,
-): RankingRow[] {
-  const normalizedA = new Map<string, number>();
-  const normalizedR = new Map<string, number>();
-
-  for (const [name, value] of countsAtribuidos.entries()) {
-    const key = name.toLowerCase();
-    normalizedA.set(key, (normalizedA.get(key) ?? 0) + value);
+  if (error) {
+    return 0;
   }
-  for (const [name, value] of countsRetirados.entries()) {
-    const key = name.toLowerCase();
-    normalizedR.set(key, (normalizedR.get(key) ?? 0) + value);
-  }
-
-  const rows = ANALYST_USERS.map((analyst: AnalystUser) => {
-    const key = analyst.name.toLowerCase();
-    const totalAtribuidos = normalizedA.get(key) ?? 0;
-    const totalRetirados = normalizedR.get(key) ?? 0;
-    return {
-      analista: analyst.name,
-      initials: analyst.initials,
-      analystId: analyst.id,
-      totalAtribuidos,
-      totalRetirados,
-      total: totalAtribuidos + totalRetirados,
-    };
-  });
-
-  const allKeys = new Set([...normalizedA.keys(), ...normalizedR.keys()]);
-  for (const name of allKeys) {
-    const exists = ANALYST_USERS.some((item) => item.name.toLowerCase() === name);
-    if (!exists) {
-      const totalAtribuidos = normalizedA.get(name) ?? 0;
-      const totalRetirados = normalizedR.get(name) ?? 0;
-      rows.push({
-        analista: name,
-        initials: name.slice(0, 1).toUpperCase() || "?",
-        analystId: `ext-${name}`,
-        totalAtribuidos,
-        totalRetirados,
-        total: totalAtribuidos + totalRetirados,
-      });
-    }
-  }
-
-  return rows.sort((a, b) => b.total - a.total || a.analista.localeCompare(b.analista));
+  return Number(count ?? 0);
 }
 
 export function AnalystRanking() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [rows, setRows] = useState<RankingRow[]>(() =>
-    buildRankingRows(new Map(), new Map()),
-  );
+  const [rows, setRows] = useState<RankingRow[]>([]);
 
   const loadRanking = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     if (!supabase) {
-      setRows(buildRankingRows(new Map(), new Map()));
+      setRows([]);
       setLoading(false);
       setError("Supabase nao configurado neste deploy.");
       return;
     }
 
-    const [atribuidosRes, retiradosRes] = await Promise.all([
-      supabase
-        .from("fila_registros")
-        .select("analista")
-        .not("analista", "is", null)
-        .in("status", STATUS_ATRIBUIDOS as unknown as string[]),
-      supabase
-        .from("fila_registros")
-        .select("analista")
-        .not("analista", "is", null)
-        .in("status", STATUS_RETIRADOS as unknown as string[]),
+    const analysts = ANALYST_USERS as AnalystUser[];
+    const promises = analysts.flatMap((a) => [
+      countByAnalyst(a.name, STATUS_ATRIBUIDOS),
+      countByAnalyst(a.name, STATUS_RETIRADOS),
     ]);
 
-    if (atribuidosRes.error || retiradosRes.error) {
-      setLoading(false);
-      setError("Nao foi possivel carregar o ranking.");
-      return;
-    }
+    const results = await Promise.all(promises);
 
-    type RowA = { analista: string | null };
-    const countsA = new Map<string, number>();
-    ((atribuidosRes.data ?? []) as RowA[]).forEach((item) => {
-      const name = String(item.analista ?? "").trim();
-      if (!name) return;
-      countsA.set(name, (countsA.get(name) ?? 0) + 1);
+    const built: RankingRow[] = analysts.map((analyst, idx) => {
+      const totalAtribuidos = results[idx * 2] ?? 0;
+      const totalRetirados = results[idx * 2 + 1] ?? 0;
+      return {
+        analista: analyst.name,
+        initials: analyst.initials,
+        analystId: analyst.id,
+        totalAtribuidos,
+        totalRetirados,
+        total: totalAtribuidos + totalRetirados,
+      };
     });
 
-    const countsR = new Map<string, number>();
-    ((retiradosRes.data ?? []) as RowA[]).forEach((item) => {
-      const name = String(item.analista ?? "").trim();
-      if (!name) return;
-      countsR.set(name, (countsR.get(name) ?? 0) + 1);
-    });
-
-    setRows(buildRankingRows(countsA, countsR));
+    setRows(built.sort((a, b) => b.total - a.total || a.analista.localeCompare(b.analista)));
     setLoading(false);
   }, []);
 

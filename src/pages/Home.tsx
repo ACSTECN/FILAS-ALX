@@ -10,6 +10,7 @@ import {
 import { CitySwitch } from "@/components/CitySwitch";
 import { HotzoneGrid } from "@/components/HotzoneGrid";
 import { AnalystRanking } from "@/components/AnalystRanking";
+import { AnalystHistory } from "@/components/AnalystHistory";
 import { QueueFilters } from "@/components/QueueFilters";
 import { QueueForm } from "@/components/QueueForm";
 import { QueueList } from "@/components/QueueList";
@@ -25,7 +26,7 @@ export default function Home() {
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
 
-  const [activeTab, setActiveTab] = useState<"fila" | "ranking">("fila");
+  const [activeTab, setActiveTab] = useState<"fila" | "ranking" | "historico">("fila");
   const [activeCity, setActiveCity] = useState<City>("Rio de Janeiro");
   const [selectedHotzone, setSelectedHotzone] = useState(
     hotzonesByCity["Rio de Janeiro"][0],
@@ -205,6 +206,17 @@ export default function Home() {
             >
               Ranking
             </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("historico")}
+              className={
+                activeTab === "historico"
+                  ? "rounded-[18px] bg-white/10 px-4 py-2 text-sm font-semibold text-white"
+                  : "rounded-[18px] px-4 py-2 text-sm text-slate-300 transition hover:text-white"
+              }
+            >
+              Historico
+            </button>
           </div>
         </div>
 
@@ -217,6 +229,10 @@ export default function Home() {
         {activeTab === "ranking" ? (
           <div className="mt-6">
             <AnalystRanking />
+          </div>
+        ) : activeTab === "historico" ? (
+          <div className="mt-6">
+            <AnalystHistory />
           </div>
         ) : (
           <div className="mt-6 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">

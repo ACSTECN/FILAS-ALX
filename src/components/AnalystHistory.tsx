@@ -117,8 +117,6 @@ export function AnalystHistory() {
         "retirado_fila",
         "retirado_tpr",
         "retirado_entregador",
-        "atribuido",
-        "retirado",
       ]);
 
     if (city !== "Todas") {
@@ -126,7 +124,7 @@ export function AnalystHistory() {
     }
 
     if (kind === "FILA") {
-      query = query.in("status", ["atribuido_fila", "retirado_fila", "atribuido", "retirado"]);
+      query = query.in("status", ["atribuido_fila", "retirado_fila"]);
     } else if (kind === "TPR") {
       query = query.in("status", ["atribuido_tpr", "retirado_tpr"]);
     } else if (kind === "ENTREGADOR") {
@@ -175,12 +173,8 @@ export function AnalystHistory() {
   }, [analystId, city, kind, month, year]);
 
   const totalRegistros = rows.length;
-  const totalAtribuidos = rows.filter((item) =>
-    item.status.startsWith("atribuido_") || item.status === "atribuido",
-  ).length;
-  const totalRetirados = rows.filter((item) =>
-    item.status.startsWith("retirado_") || item.status === "retirado",
-  ).length;
+  const totalAtribuidos = rows.filter((item) => item.status.startsWith("atribuido_")).length;
+  const totalRetirados = rows.filter((item) => item.status.startsWith("retirado_")).length;
 
   return (
     <section className="space-y-6">

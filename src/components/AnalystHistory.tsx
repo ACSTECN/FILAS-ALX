@@ -29,7 +29,7 @@ function monthOptions() {
 
 function yearOptions() {
   const current = new Date().getFullYear();
-  return [current - 1, current, current + 1].map((value) => String(value));
+  return ["all", current - 1, current, current + 1].map((value) => String(value));
 }
 
 function pad(n: number) {
@@ -44,6 +44,10 @@ function todayISO() {
 function buildDateFilter(year: string, month: string, day: string) {
   if (day !== "all") {
     return { type: "eq", value: day } as const;
+  }
+
+  if (year === "all" && month === "all") {
+    return { type: "none" } as const;
   }
 
   if (month === "all") {
@@ -86,11 +90,10 @@ function sortByLatest(list: QueueRecord[]) {
 
 export function AnalystHistory() {
   const user = useAuthStore((state) => state.user);
-  const today = new Date();
   const [city, setCity] = useState<CityFilter>("Todas");
   const [kind, setKind] = useState<KindFilter>("Todas");
   const [month, setMonth] = useState<string>("all");
-  const [year, setYear] = useState(() => String(today.getFullYear()));
+  const [year, setYear] = useState<string>("all");
   const [day, setDay] = useState<string>("all");
 
   const [loading, setLoading] = useState(true);
@@ -125,7 +128,7 @@ export function AnalystHistory() {
     let query = supabase
       .from("fila_registros")
       .select("*")
-      .eq("analista", selectedAnalyst.name)
+      .ilike("analista", selectedAnalyst.name)
       .in("status", [
         "atribuido_fila",
         "atribuido_tpr",
@@ -291,7 +294,7 @@ export function AnalystHistory() {
             >
               {yearOptions().map((value) => (
                 <option key={value} value={value} className="bg-slate-950 text-white">
-                  {value}
+                  {value === "all" ? "Todos os anos" : value}
                 </option>
               ))}
             </select>

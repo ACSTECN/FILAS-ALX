@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Crown, History, Sparkles, UsersRound, MapPin } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { ANALYST_USERS, type AnalystUser } from "@/types/auth";
+import type { City } from "@/types/queue";
+import type { UnifiedItemKind } from "@/types/unified";
 
 const STATUS_ATRIBUIDOS = [
   "atribuido_fila",
@@ -23,6 +25,12 @@ type RankingRow = {
   analystId: string;
 };
 
+type CityFilter = City | "Todas";
+type KindFilter = UnifiedItemKind | "Todas";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyFilter = any;
+
 function colorFromName(name: string) {
   let hash = 0;
   for (let i = 0; i < name.length; i += 1) {
@@ -35,14 +43,126 @@ function colorFromName(name: string) {
   };
 }
 
-async function countByAnalyst(analystName: string, statuses: readonly string[]) {
-  if (!supabase) return 0;
-  const { count, error } = await supabase
-    .from("fila_registros")
-    .select("*", { count: "exact", head: true })
+function statusAtribuidosByKind(kind: KindFilter) {
+  if (kind === "FILA") return ["atribuido_fila"] as const;
+  if (kind === "TPR") return ["atribuido_tpr"] as const;
+  if (kind === "ENTREGADOR") return ["atribuido_entregador"] as const;
+  return STATUS_ATRIBUIDOS;
+}
+
+function statusRetiradosByKind(kind: KindFilter) {
+  if (kind === "FILA") return ["retirado_fila"] as const;
+  if (kind === "TPR") return ["retirado_tpr"] as const;
+  if (kind === "ENTREGADOR") return ["retirado_entregador"] as const;
+  return STATUS_RETIRADOS;
+}
+
+function monthOptions() {
+  return [
+    { value: "all", label: "Todos" },
+    { value: "01", label: "Janeiro" },
+    { value: "02", label: "Fevereiro" },
+    { value: "03", label: "Marco" },
+    { value: "04", label: "Abril" },
+    { value: "05", label: "Maio" },
+    { value: "06", label: "Junho" },
+    { value: "07", label: "Julho" },
+    { value: "08", label: "Agosto" },
+    { value: "09", label: "Setembro" },
+    { value: "10", label: "Outubro" },
+    { value: "11", label: "Novembro" },
+    { value: "12", label: "Dezembro" },
+  ];
+}
+
+function yearOptions() {
+  const current = new Date().getFullYear();
+  return ["all", current - 1, current, current + 1].map((value) => String(value));
+}
+
+function pad(n: number) {
+  return String(n).padStart(2, "0");
+}
+
+function todayISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function buildDateFilter(year: string, month: string, day: string) {
+  if (day !== "all") {
+    return { type: "eq", value: day } as const;
+  }
+  if (year === "all" && month === "all") {
+    return { type: "none" } as const;
+  }
+  if (month === "all") {
+    return { type: "year", value: year } as const;
+  }
+  const start = `${year}-${month}-01`;
+  const startDate = new Date(`${start}T00:00:00`);
+  const endDate = new Date(startDate);
+  endDate.setMonth(endDate.getMonth() + 1);
+  const end = endDate.toLocaleDateString("en-CA");
+  return { type: "range", start, end } as const;
+}
+
+function applyFiltersToCountQuery({
+  query,
+  analystName,
+  city,
+  dateFilter,
+  statuses,
+}: {
+  query: AnyFilter;
+  analystName: string;
+  city: CityFilter;
+  dateFilter: ReturnType<typeof buildDateFilter>;
+  statuses: readonly string[];
+}) {
+  query = query
     .not("analista", "is", null)
     .ilike("analista", analystName)
     .in("status", statuses as unknown as string[]);
+
+  if (city !== "Todas") {
+    query = query.eq("cidade", city);
+  }
+
+  if (dateFilter.type === "range") {
+    query = query.gte("data_fila", dateFilter.start).lt("data_fila", dateFilter.end);
+  } else if (dateFilter.type === "year") {
+    query = query
+      .gte("data_fila", `${dateFilter.value}-01-01`)
+      .lt("data_fila", `${Number(dateFilter.value) + 1}-01-01`);
+  } else if (dateFilter.type === "eq") {
+    query = query.eq("data_fila", dateFilter.value);
+  }
+
+  return query;
+}
+
+async function countByAnalyst({
+  analystName,
+  statuses,
+  city,
+  dateFilter,
+}: {
+  analystName: string;
+  statuses: readonly string[];
+  city: CityFilter;
+  dateFilter: ReturnType<typeof buildDateFilter>;
+}) {
+  if (!supabase) return 0;
+  const { count, error } = await applyFiltersToCountQuery({
+    query: supabase
+      .from("fila_registros")
+      .select("*", { count: "exact", head: true }),
+    analystName,
+    city,
+    dateFilter,
+    statuses,
+  });
 
   if (error) {
     return 0;
@@ -51,9 +171,23 @@ async function countByAnalyst(analystName: string, statuses: readonly string[]) 
 }
 
 export function AnalystRanking() {
+  const [city, setCity] = useState<CityFilter>("Todas");
+  const [kind, setKind] = useState<KindFilter>("Todas");
+  const [month, setMonth] = useState<string>("all");
+  const [year, setYear] = useState<string>("all");
+  const [day, setDay] = useState<string>("all");
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<RankingRow[]>([]);
+
+  const dateFilter = useMemo(
+    () => buildDateFilter(year, month, day),
+    [year, month, day],
+  );
+
+  const statusesA = useMemo(() => statusAtribuidosByKind(kind), [kind]);
+  const statusesR = useMemo(() => statusRetiradosByKind(kind), [kind]);
 
   const loadRanking = useCallback(async () => {
     setLoading(true);
@@ -68,8 +202,18 @@ export function AnalystRanking() {
 
     const analysts = ANALYST_USERS as AnalystUser[];
     const promises = analysts.flatMap((a) => [
-      countByAnalyst(a.name, STATUS_ATRIBUIDOS),
-      countByAnalyst(a.name, STATUS_RETIRADOS),
+      countByAnalyst({
+        analystName: a.name,
+        statuses: statusesA,
+        city,
+        dateFilter,
+      }),
+      countByAnalyst({
+        analystName: a.name,
+        statuses: statusesR,
+        city,
+        dateFilter,
+      }),
     ]);
 
     const results = await Promise.all(promises);
@@ -89,7 +233,7 @@ export function AnalystRanking() {
 
     setRows(built.sort((a, b) => b.total - a.total || a.analista.localeCompare(b.analista)));
     setLoading(false);
-  }, []);
+  }, [statusesA, statusesR, city, dateFilter]);
 
   useEffect(() => {
     void loadRanking();
@@ -132,7 +276,7 @@ export function AnalystRanking() {
   return (
     <section className="space-y-6">
       <div className="alx-card rounded-[32px] border border-white/10 p-6 backdrop-blur">
-        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.28em] text-slate-500">
               Ranking geral
@@ -141,10 +285,113 @@ export function AnalystRanking() {
               Analistas com mais entregadores atribuidos
             </h2>
             <p className="mt-2 text-sm text-slate-400">
-              Total acumulado de todas as atribuicoes e retiradas (FILA, TPR e Entregador).
               FILA / TPR contam para quem registrou a entrada; Entregador conta para quem
               atribuir o interesse.
             </p>
+          </div>
+        </div>
+
+        <div className="mt-6 flex flex-col gap-3 lg:flex-row lg:items-end lg:flex-wrap">
+          <div className="w-full lg:w-[180px]">
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-slate-400">
+              Cidade
+            </label>
+            <select
+              value={city}
+              onChange={(event) => setCity(event.target.value as CityFilter)}
+              className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-sm text-white outline-none"
+            >
+              <option value="Todas" className="bg-slate-950 text-white">Todas</option>
+              <option value="São Paulo" className="bg-slate-950 text-white">São Paulo</option>
+              <option value="Rio de Janeiro" className="bg-slate-950 text-white">Rio de Janeiro</option>
+            </select>
+          </div>
+
+          <div className="w-full lg:w-[180px]">
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-slate-400">
+              Tipo
+            </label>
+            <select
+              value={kind}
+              onChange={(event) => setKind(event.target.value as KindFilter)}
+              className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-sm text-white outline-none"
+            >
+              <option value="Todas" className="bg-slate-950 text-white">Todos os tipos</option>
+              <option value="FILA" className="bg-slate-950 text-white">FILA</option>
+              <option value="TPR" className="bg-slate-950 text-white">TPR</option>
+              <option value="ENTREGADOR" className="bg-slate-950 text-white">Entregador</option>
+            </select>
+          </div>
+
+          <div className="w-full lg:w-[180px]">
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-slate-400">
+              Dia
+            </label>
+            <select
+              value={day === "all" ? "all" : day === todayISO() ? "today" : "picker"}
+              onChange={(event) => {
+                const value = event.target.value;
+                if (value === "all") setDay("all");
+                else if (value === "today") setDay(todayISO());
+              }}
+              className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-sm text-white outline-none"
+            >
+              <option value="all" className="bg-slate-950 text-white">Todos os dias</option>
+              <option value="today" className="bg-slate-950 text-white">Hoje</option>
+              <option value="picker" className="bg-slate-950 text-white">Escolher data</option>
+            </select>
+          </div>
+
+          {day !== "all" && day !== todayISO() && (
+            <div className="w-full lg:w-[200px]">
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-slate-400">
+                Data
+              </label>
+              <input
+                type="date"
+                value={day}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  if (value) setDay(value);
+                  else setDay("all");
+                }}
+                className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-sm text-white outline-none"
+              />
+            </div>
+          )}
+
+          <div className="w-full lg:w-[180px]">
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-slate-400">
+              Mês
+            </label>
+            <select
+              value={month}
+              onChange={(event) => setMonth(event.target.value)}
+              className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-sm text-white outline-none"
+            >
+              {monthOptions().map((option) => (
+                <option key={option.value} value={option.value} className="bg-slate-950 text-white">
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="w-full lg:w-[160px]">
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-slate-400">
+              Ano
+            </label>
+            <select
+              value={year}
+              onChange={(event) => setYear(event.target.value)}
+              className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-sm text-white outline-none"
+            >
+              {yearOptions().map((value) => (
+                <option key={value} value={value} className="bg-slate-950 text-white">
+                  {value === "all" ? "Todos os anos" : value}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       </div>

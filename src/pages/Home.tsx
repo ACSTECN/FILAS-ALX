@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   BellElectric,
+  Calendar,
+  Clock,
   DatabaseZap,
   LogOut,
   Map,
   RadioTower,
+  Sparkles,
   User,
 } from "lucide-react";
 import { CitySwitch } from "@/components/CitySwitch";
@@ -22,9 +25,33 @@ import { useQueueStore } from "@/store/queueStore";
 import { useAuthStore } from "@/store/authStore";
 import type { City, QueueFilters as QueueFiltersType } from "@/types/queue";
 
+function formatDateBR(date: Date) {
+  return date.toLocaleDateString("pt-BR", {
+    weekday: "long",
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function formatTimeBR(date: Date) {
+  return date.toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getGreetingByHour(hour: number) {
+  if (hour >= 5 && hour < 12) return "Bom dia";
+  if (hour >= 12 && hour < 18) return "Boa tarde";
+  return "Boa noite";
+}
+
 export default function Home() {
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
+
+  const [now, setNow] = useState<Date>(new Date());
 
   const [activeTab, setActiveTab] = useState<"fila" | "ranking" | "historico">("fila");
   const [activeCity, setActiveCity] = useState<City>("Rio de Janeiro");
@@ -48,8 +75,18 @@ export default function Home() {
   useQueueRealtime();
 
   useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 30 * 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
     void loadQueue();
   }, [loadQueue]);
+
+  const userName = user?.analystName ?? user?.identifier ?? "Usuario";
+  const greeting = getGreetingByHour(now.getHours());
+  const dateLabel = formatDateBR(now);
+  const timeLabel = formatTimeBR(now);
 
   const filteredQueue = useMemo(() => {
     return queue.filter((record) => {
@@ -91,6 +128,61 @@ export default function Home() {
       </div>
 
       <section className="mx-auto max-w-7xl px-4 pb-10 pt-6 sm:px-6 lg:px-8">
+        <div className="mb-6 grid gap-4 lg:grid-cols-[1fr_auto]">
+          <div className="alx-card rounded-[32px] border border-white/10 bg-gradient-to-br from-[#2563eb]/15 via-[#0f766e]/10 to-[#f97316]/10 p-6 backdrop-blur">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-4">
+                <div className="grid h-14 w-14 shrink-0 place-items-center rounded-[22px] border border-white/10 bg-gradient-to-br from-[#2563eb] to-[#0f766e] shadow-[0_18px_50px_rgba(37,99,235,0.25)]">
+                  <Sparkles className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-[0.28em] text-[#93c5fd]">
+                    {greeting}
+                  </p>
+                  <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">
+                    Bem-vindo,{" "}
+                    <span className="bg-gradient-to-r from-[#7dd3fc] via-[#a5f3fc] to-[#fdba74] bg-clip-text text-transparent">
+                      {userName}
+                    </span>
+                  </h1>
+                  <p className="mt-2 text-sm text-slate-300">
+                    Painel operacional da fila unificada ALX · tudo sincronizado em tempo real.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:w-[420px]">
+            <div className="alx-card rounded-[28px] border border-white/10 bg-white/[0.04] p-5 backdrop-blur">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-[#38bdf8]" />
+                  <p className="text-xs uppercase tracking-[0.22em] text-slate-400">
+                    Hoje
+                  </p>
+                </div>
+              </div>
+              <p className="mt-3 text-base font-semibold text-white capitalize">
+                {dateLabel}
+              </p>
+            </div>
+            <div className="alx-card rounded-[28px] border border-white/10 bg-white/[0.04] p-5 backdrop-blur">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-[#f97316]" />
+                  <p className="text-xs uppercase tracking-[0.22em] text-slate-400">
+                    Horario
+                  </p>
+                </div>
+              </div>
+              <p className="mt-3 text-2xl font-semibold tabular-nums text-white">
+                {timeLabel}
+              </p>
+            </div>
+          </div>
+        </div>
+
         <div className="alx-panel alx-glow alx-sheen rounded-[36px] border border-white/10 p-6 sm:p-8">
           <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
             <div className="max-w-3xl">
@@ -120,7 +212,7 @@ export default function Home() {
 
             <div className="grid gap-3 sm:grid-cols-3 xl:w-[420px] xl:grid-cols-1">
               {[
-                { icon: Map, label: "8 hotzones", detail: "RJ e SP em uma unica tela" },
+                { icon: Map, label: "10 hotzones", detail: "RJ e SP em uma unica tela" },
                 {
                   icon: BellElectric,
                   label: "Fila aberta",

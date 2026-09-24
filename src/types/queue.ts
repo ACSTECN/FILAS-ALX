@@ -10,6 +10,8 @@ export type Hotzone =
   | "Tijuca"
   | "Nilópolis"
   | "Zona Sul"
+  | "Méier"
+  | "Madureira"
   | "Mooca"
   | "Paulista"
   | "Santo Amaro";

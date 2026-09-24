@@ -431,6 +431,128 @@ export function AnalystRanking() {
         </div>
       </div>
 
+      <div className="alx-card rounded-[32px] border border-white/10 p-6 backdrop-blur">
+        <div className="mb-5 flex items-center justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.28em] text-slate-500">
+              Dashboard
+            </p>
+            <h3 className="mt-2 text-xl font-semibold text-white">
+              Desempenho por analista
+            </h3>
+          </div>
+          <div className="flex items-center gap-4 text-xs text-slate-400">
+            <span className="inline-flex items-center gap-2">
+              <span className="h-3 w-3 rounded-full bg-[#38bdf8]" /> Atribuidos
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <span className="h-3 w-3 rounded-full bg-[#f97316]" /> Retirados
+            </span>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="flex min-h-[260px] items-center justify-center text-slate-300">
+            Carregando grafico...
+          </div>
+        ) : rows.length === 0 || !rows.some((r) => r.totalAtribuidos + r.totalRetirados > 0) ? (
+          <div className="rounded-[24px] border border-dashed border-white/10 bg-white/5 p-8 text-center">
+            <p className="text-lg font-medium text-white">Sem dados para exibir</p>
+            <p className="mt-2 text-sm text-slate-400">
+              Realize atribuicoes para visualizar o grafico de desempenho.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {rows.map((row) => {
+              const maxTotal = Math.max(...rows.map((r) => r.totalAtribuidos + r.totalRetirados), 1);
+              const aPct = maxTotal > 0 ? (row.totalAtribuidos / maxTotal) * 100 : 0;
+              const rPct = maxTotal > 0 ? (row.totalRetirados / maxTotal) * 100 : 0;
+              const avatar = colorFromName(row.analista);
+              return (
+                <div
+                  key={row.analystId}
+                  className="rounded-[20px] border border-white/10 bg-white/[0.03] p-4"
+                >
+                  <div className="mb-3 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-white/10 text-xs font-bold text-white"
+                        style={{ backgroundImage: `linear-gradient(135deg, ${avatar.a}, ${avatar.b})` }}
+                      >
+                        {row.initials}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-white uppercase tracking-wide">
+                          {row.analista}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          {row.totalAtribuidos} atrib · {row.totalRetirados} retir · {row.total} total
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-white">{row.total}</p>
+                      <p className="text-xs text-slate-500">total</p>
+                    </div>
+                  </div>
+                  <div className="flex h-3 w-full overflow-hidden rounded-full bg-white/5">
+                    <div
+                      className="h-full transition-[width] duration-700"
+                      style={{
+                        width: `${aPct}%`,
+                        background: "linear-gradient(90deg, #0ea5e9, #38bdf8)",
+                      }}
+                      title={`Atribuidos: ${row.totalAtribuidos}`}
+                    />
+                    <div
+                      className="h-full transition-[width] duration-700"
+                      style={{
+                        width: `${rPct}%`,
+                        background: "linear-gradient(90deg, #ea580c, #f97316)",
+                      }}
+                      title={`Retirados: ${row.totalRetirados}`}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+
+            <div className="mt-6 grid gap-4 sm:grid-cols-3">
+              <div className="rounded-[20px] border border-white/10 bg-gradient-to-br from-[#0f766e]/20 to-transparent p-4">
+                <p className="text-xs uppercase tracking-[0.22em] text-slate-400">
+                  Media por analista
+                </p>
+                <p className="mt-3 text-2xl font-semibold text-white">
+                  {rows.length > 0 ? (totalGeral / rows.length).toFixed(1) : "0"}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">movimentacoes em media</p>
+              </div>
+              <div className="rounded-[20px] border border-white/10 bg-gradient-to-br from-[#2563eb]/20 to-transparent p-4">
+                <p className="text-xs uppercase tracking-[0.22em] text-slate-400">
+                  Taxa de conversao
+                </p>
+                <p className="mt-3 text-2xl font-semibold text-white">
+                  {totalGeral > 0 ? `${((totalRetirados / totalGeral) * 100).toFixed(0)}%` : "0%"}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">retirados / total</p>
+              </div>
+              <div className="rounded-[20px] border border-white/10 bg-gradient-to-br from-[#a78bfa]/20 to-transparent p-4">
+                <p className="text-xs uppercase tracking-[0.22em] text-slate-400">
+                  Lider atual
+                </p>
+                <p className="mt-3 text-2xl font-semibold text-white">
+                  {top3[0] ? top3[0].analista : "-"}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {top3[0] ? `${top3[0].totalAtribuidos} atribuicoes` : "sem dados"}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <div className="space-y-6">
           <div className="alx-card rounded-[28px] border border-white/10 p-5 backdrop-blur">

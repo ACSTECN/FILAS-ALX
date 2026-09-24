@@ -3,7 +3,7 @@ import type { City, Hotzone, Shift } from "@/types/queue";
 export const cityOptions: City[] = ["Rio de Janeiro", "São Paulo"];
 
 export const hotzonesByCity: Record<City, Hotzone[]> = {
-  "Rio de Janeiro": ["Bangu", "Santa Cruz", "Tijuca", "Nilópolis", "Zona Sul"],
+  "Rio de Janeiro": ["Bangu", "Santa Cruz", "Tijuca", "Nilópolis", "Zona Sul", "Méier", "Madureira"],
   "São Paulo": ["Mooca", "Paulista", "Santo Amaro"],
 };
 

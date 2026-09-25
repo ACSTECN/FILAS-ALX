@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState, useRef } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   AlertTriangle,
@@ -9,10 +9,20 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { useCompanyScoped } from "@/hooks/useCompanyScoped";
+import { CompanyHotzoneGrid } from "@/components/CompanyHotzoneGrid";
+import { CompanyQueueFilters } from "@/components/CompanyQueueFilters";
+import { CompanyQueueForm } from "@/components/CompanyQueueForm";
 import { hotzonesByCity } from "@/data/hotzones";
 import { hasSupabaseConfig, supabase } from "@/lib/supabase";
-import type { City, Hotzone, QueueFormValues, Shift } from "@/types/queue";
-import { formatCPF, isValidCPF, normalizeCPF } from "@/types/auth";
+import type {
+  City,
+  Hotzone,
+  QueueFilters as QueueFiltersType,
+  QueueFormValues,
+  QueueRecord,
+  Shift,
+} from "@/types/queue";
+import { formatCPF, isValidCPF, normalizeCPF, type AuthUser } from "@/types/auth";
 
 function statusLabel(status: string) {
   if (status.startsWith("na_fila_")) return "Em interesse";
@@ -26,6 +36,15 @@ function tipoLabel(tipo: string) {
   return "Fila";
 }
 
+const DEFAULT_FILTERS: QueueFiltersType = {
+  cidade: "Todas",
+  hotzone: "Todas",
+  turno_desejado: "Todos",
+  data_fila: "Todas",
+  origem: "Todas",
+  tipo: "Todas",
+};
+
 export default function CompanyEntregador() {
   const { slug = "" } = useParams();
   const navigate = useNavigate();
@@ -37,25 +56,79 @@ export default function CompanyEntregador() {
     stores,
   } = useCompanyScoped(slug);
 
-  const queueStore = stores?.queue ?? null;
-  const authStore = stores?.auth.useCompanyAuthStore ?? null;
+  const [safeAuthUser, setSafeAuthUser] = useState<AuthUser | null>(null);
+  const safeLoginEntregadorRef = useRef<((cpf: string) => boolean) | null>(null);
+  const [safeLoginError, setSafeLoginError] = useState<string | null>(null);
 
-  const authUser = authStore ? authStore((s) => s.user) : null;
-  const loginEntregador = authStore ? authStore((s) => s.loginEntregador) : null;
-  const loginError = authStore ? authStore((s) => s.loginError) : null;
+  const [safeQueue, setSafeQueue] = useState<QueueRecord[]>([]);
+  const [safeLoading, setSafeLoading] = useState<boolean>(true);
+  const [safeSyncing, setSafeSyncing] = useState<boolean>(false);
+  const [safeError, setSafeError] = useState<string | null>(null);
+  const [safeFilters, setSafeFilters] = useState<QueueFiltersType>(DEFAULT_FILTERS);
 
-  const queue = queueStore ? queueStore((s) => s.queue) : [];
-  const loading = queueStore ? queueStore((s) => s.loading) : true;
-  const syncing = queueStore ? queueStore((s) => s.syncing) : false;
-  const error = queueStore ? queueStore((s) => s.error) : null;
-  const loadEntregadorQueue = queueStore
-    ? queueStore((s) => s.loadEntregadorQueue)
-    : null;
-  const createRecord = queueStore ? queueStore((s) => s.createRecord) : null;
+  const loadEntregadorQueueRef = useRef<((cpf: string) => Promise<void>) | null>(null);
+  const createRecordRef = useRef<((values: QueueFormValues) => Promise<void>) | null>(null);
+  const setFiltersRef = useRef<((filters: Partial<QueueFiltersType>) => void) | null>(null);
+  const queueStoreGetStateRef = useRef<(() => unknown) | null>(null);
+
+  useEffect(() => {
+    if (!stores) {
+      setSafeAuthUser(null);
+      safeLoginEntregadorRef.current = null;
+      setSafeLoginError(null);
+      setSafeQueue([]);
+      setSafeLoading(true);
+      setSafeSyncing(false);
+      setSafeError(null);
+      setSafeFilters(DEFAULT_FILTERS);
+      loadEntregadorQueueRef.current = null;
+      createRecordRef.current = null;
+      setFiltersRef.current = null;
+      queueStoreGetStateRef.current = null;
+      return;
+    }
+
+    const useAuthStore = stores.auth.useCompanyAuthStore;
+    const useQueueStore = stores.queue;
+
+    const unsubAuthUser = useAuthStore.subscribe((s) => setSafeAuthUser(s.user));
+    setSafeAuthUser(useAuthStore.getState().user);
+    const unsubLoginError = useAuthStore.subscribe((s) => setSafeLoginError(s.loginError));
+    setSafeLoginError(useAuthStore.getState().loginError);
+    const authState = useAuthStore.getState();
+    safeLoginEntregadorRef.current = authState.loginEntregador;
+
+    const unsubQueue = useQueueStore.subscribe((s) => setSafeQueue(s.queue));
+    setSafeQueue(useQueueStore.getState().queue);
+    const unsubLoading = useQueueStore.subscribe((s) => setSafeLoading(s.loading));
+    setSafeLoading(useQueueStore.getState().loading);
+    const unsubSyncing = useQueueStore.subscribe((s) => setSafeSyncing(s.syncing));
+    setSafeSyncing(useQueueStore.getState().syncing);
+    const unsubError = useQueueStore.subscribe((s) => setSafeError(s.error));
+    setSafeError(useQueueStore.getState().error);
+    const unsubFilters = useQueueStore.subscribe((s) => setSafeFilters(s.filters));
+    setSafeFilters(useQueueStore.getState().filters);
+
+    const queueState = useQueueStore.getState();
+    loadEntregadorQueueRef.current = queueState.loadEntregadorQueue;
+    createRecordRef.current = queueState.createRecord;
+    setFiltersRef.current = queueState.setFilters;
+    queueStoreGetStateRef.current = useQueueStore.getState;
+
+    return () => {
+      unsubAuthUser();
+      unsubLoginError();
+      unsubQueue();
+      unsubLoading();
+      unsubSyncing();
+      unsubError();
+      unsubFilters();
+    };
+  }, [stores]);
 
   const [cpf, setCpf] = useState("");
   const [cpfConfirmado, setCpfConfirmado] = useState<string | null>(
-    authUser?.role === "entregador" ? authUser.identifier : null,
+    safeAuthUser?.role === "entregador" ? safeAuthUser.identifier : null,
   );
   const [cidade, setCidade] = useState<City>("Rio de Janeiro");
   const [hotzone, setHotzone] = useState<Hotzone>(hotzonesByCity["Rio de Janeiro"][0]);
@@ -110,13 +183,13 @@ export default function CompanyEntregador() {
   }, [location.pathname, navigate, slug]);
 
   useEffect(() => {
-    if (cpfConfirmado && loadEntregadorQueue) {
-      void loadEntregadorQueue(cpfConfirmado);
+    if (cpfConfirmado && loadEntregadorQueueRef.current) {
+      void loadEntregadorQueueRef.current(cpfConfirmado);
     }
-  }, [cpfConfirmado, loadEntregadorQueue]);
+  }, [cpfConfirmado, stores]);
 
   useEffect(() => {
-    if (!company || !loadEntregadorQueue || !cpfConfirmado) return;
+    if (!company || !loadEntregadorQueueRef.current || !cpfConfirmado) return;
     if (!hasSupabaseConfig) return;
     if (!supabase) return;
     const suffix = company.id.slice(0, 8);
@@ -126,25 +199,44 @@ export default function CompanyEntregador() {
         "postgres_changes",
         { event: "*", schema: "public", table: "fila_registros" },
         () => {
-          void loadEntregadorQueue(cpfConfirmado);
+          if (loadEntregadorQueueRef.current && cpfConfirmado) {
+            void loadEntregadorQueueRef.current(cpfConfirmado);
+          }
         },
       )
       .subscribe();
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [company, loadEntregadorQueue, cpfConfirmado]);
+  }, [company, stores, cpfConfirmado]);
 
   const registros = useMemo(
     () =>
-      [...queue]
+      [...safeQueue]
         .filter((item) => item.cpf === cpfConfirmado)
         .sort((a, b) => b.criado_em.localeCompare(a.criado_em)),
-    [cpfConfirmado, queue],
+    [cpfConfirmado, safeQueue],
   );
 
-  const pending = registros.filter((item) => item.status.startsWith("na_fila_"));
-  const concluidos = registros.filter((item) => !item.status.startsWith("na_fila_"));
+  const registrosFiltrados = useMemo(() => {
+    return registros.filter((record) => {
+      const byCity = safeFilters.cidade === "Todas" || record.cidade === safeFilters.cidade;
+      const byHotzone =
+        safeFilters.hotzone === "Todas" || record.hotzone === safeFilters.hotzone;
+      const byShift =
+        safeFilters.turno_desejado === "Todos" ||
+        record.turno_desejado === safeFilters.turno_desejado;
+      const byDate =
+        safeFilters.data_fila === "Todas" || record.data_fila === safeFilters.data_fila;
+      const byOrigem =
+        safeFilters.origem === "Todas" || record.origem === safeFilters.origem;
+      const byTipo = safeFilters.tipo === "Todas" || record.tipo === safeFilters.tipo;
+      return byCity && byHotzone && byShift && byDate && byOrigem && byTipo;
+    });
+  }, [registros, safeFilters]);
+
+  const pending = registrosFiltrados.filter((item) => item.status.startsWith("na_fila_"));
+  const concluidos = registrosFiltrados.filter((item) => !item.status.startsWith("na_fila_"));
 
   const handleIdentificar = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -159,16 +251,16 @@ export default function CompanyEntregador() {
         return;
       }
 
-      if (loginEntregador) {
-        const ok = loginEntregador(digits);
+      if (safeLoginEntregadorRef.current) {
+        const ok = safeLoginEntregadorRef.current(digits);
         if (!ok) {
-          setFormError(loginError ?? "CPF invalido.");
+          setFormError(safeLoginError ?? "CPF invalido.");
           return;
         }
       }
 
       setCpfConfirmado(digits);
-      if (loadEntregadorQueue) await loadEntregadorQueue(digits);
+      if (loadEntregadorQueueRef.current) await loadEntregadorQueueRef.current(digits);
       navigate(`/c/${slug}/entregador`, { replace: true });
     } finally {
       setCpfLoading(false);
@@ -214,10 +306,13 @@ export default function CompanyEntregador() {
       entregador_contato: contato.trim() || null,
     };
 
-    if (createRecord) await createRecord(payload);
+    if (createRecordRef.current) await createRecordRef.current(payload);
 
-    if (queueStore && queueStore.getState().error) {
-      setFormError(queueStore.getState().error);
+    const storeState = queueStoreGetStateRef.current
+      ? (queueStoreGetStateRef.current() as { error?: string | null })
+      : null;
+    if (storeState?.error) {
+      setFormError(storeState.error);
       return;
     }
 
@@ -225,8 +320,28 @@ export default function CompanyEntregador() {
     setContato("");
     setConfirmacaoOk(false);
     setFormSuccess("Interesse de agenda registrado. A equipe ira acompanhar.");
-    if (cpfConfirmado && loadEntregadorQueue) {
-      await loadEntregadorQueue(cpfConfirmado);
+    if (cpfConfirmado && loadEntregadorQueueRef.current) {
+      await loadEntregadorQueueRef.current(cpfConfirmado);
+    }
+  };
+
+  const handleChangeFilters = (nextFilters: Partial<QueueFiltersType>) => {
+    if (setFiltersRef.current) setFiltersRef.current(nextFilters);
+  };
+
+  const handleCompanyFormSubmit = async (values: QueueFormValues) => {
+    if (createRecordRef.current) {
+      await createRecordRef.current({
+        ...values,
+        origem: "entregador",
+        tipo: "ENTREGADOR",
+        cpf: normalizeCPF(cpfConfirmado ?? values.cpf ?? ""),
+        nome: nome.trim() || values.nome,
+        entregador_contato: contato.trim() || values.entregador_contato || null,
+      });
+      if (cpfConfirmado && loadEntregadorQueueRef.current) {
+        await loadEntregadorQueueRef.current(cpfConfirmado);
+      }
     }
   };
 
@@ -403,198 +518,246 @@ export default function CompanyEntregador() {
           </section>
         ) : (
           <section className="mt-8 grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-            <form
-              onSubmit={handleSubmit}
-              className="alx-card rounded-[32px] border border-white/10 p-6 shadow-[0_24px_90px_rgba(2,6,23,0.48)] backdrop-blur"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.32em] text-[#f97316]">
-                    Interesse de agenda
-                  </p>
-                  <h3 className="mt-3 text-2xl font-semibold">
-                    Cadastrar data de interesse
-                  </h3>
+            <div className="space-y-6">
+              <form
+                onSubmit={handleSubmit}
+                className="alx-card rounded-[32px] border border-white/10 p-6 shadow-[0_24px_90px_rgba(2,6,23,0.48)] backdrop-blur"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.32em] text-[#f97316]">
+                      Interesse de agenda
+                    </p>
+                    <h3 className="mt-3 text-2xl font-semibold">
+                      Cadastrar data de interesse
+                    </h3>
+                  </div>
+                  <span className="inline-flex items-center gap-2 rounded-full border border-[#fb923c]/30 bg-[#fb923c]/10 px-3 py-1 text-xs text-[#fff7ed]">
+                    CPF: {formatCPF(cpfConfirmado)}
+                  </span>
                 </div>
-                <span className="inline-flex items-center gap-2 rounded-full border border-[#fb923c]/30 bg-[#fb923c]/10 px-3 py-1 text-xs text-[#fff7ed]">
-                  CPF: {formatCPF(cpfConfirmado)}
-                </span>
-              </div>
 
-              <div className="mt-6 grid gap-4 md:grid-cols-2">
-                <label className="space-y-2 text-sm text-slate-300 md:col-span-2">
-                  <span>Nome completo</span>
-                  <input
-                    value={nome}
-                    onChange={(event) => setNome(event.target.value)}
-                    placeholder="Digite seu nome"
-                    className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-[#f97316]/60"
-                  />
-                </label>
+                <div className="mt-6 grid gap-4 md:grid-cols-2">
+                  <label className="space-y-2 text-sm text-slate-300 md:col-span-2">
+                    <span>Nome completo</span>
+                    <input
+                      value={nome}
+                      onChange={(event) => setNome(event.target.value)}
+                      placeholder="Digite seu nome"
+                      className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-[#f97316]/60"
+                    />
+                  </label>
 
-                <label className="space-y-2 text-sm text-slate-300">
-                  <span>Cidade</span>
-                  <select
-                    value={cidade}
-                    onChange={(event) => {
-                      const next = event.target.value as City;
-                      setCidade(next);
-                      const all = hotzonesByCity[next];
-                      const first = hotzoneProp
-                        ? all.find((hz) => hotzoneProp.includes(hz)) ?? all[0]
-                        : all[0];
-                      if (first) setHotzone(first);
-                    }}
-                    className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none"
-                  >
-                    <option value="Rio de Janeiro" className="bg-slate-950 text-white">
-                      Rio de Janeiro
-                    </option>
-                    <option value="São Paulo" className="bg-slate-950 text-white">
-                      São Paulo
-                    </option>
-                  </select>
-                </label>
-
-                <label className="space-y-2 text-sm text-slate-300">
-                  <span>Hotzone</span>
-                  {cityHotzones.length > 0 ? (
+                  <label className="space-y-2 text-sm text-slate-300">
+                    <span>Cidade</span>
                     <select
-                      value={hotzone}
-                      onChange={(event) => setHotzone(event.target.value as Hotzone)}
+                      value={cidade}
+                      onChange={(event) => {
+                        const next = event.target.value as City;
+                        setCidade(next);
+                        const all = hotzonesByCity[next];
+                        const first = hotzoneProp
+                          ? all.find((hz) => hotzoneProp.includes(hz)) ?? all[0]
+                          : all[0];
+                        if (first) setHotzone(first);
+                      }}
                       className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none"
                     >
-                      {cityHotzones.map((item) => (
+                      <option value="Rio de Janeiro" className="bg-slate-950 text-white">
+                        Rio de Janeiro
+                      </option>
+                      <option value="São Paulo" className="bg-slate-950 text-white">
+                        São Paulo
+                      </option>
+                    </select>
+                  </label>
+
+                  <label className="space-y-2 text-sm text-slate-300">
+                    <span>Hotzone</span>
+                    {cityHotzones.length > 0 ? (
+                      <select
+                        value={hotzone}
+                        onChange={(event) => setHotzone(event.target.value as Hotzone)}
+                        className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none"
+                      >
+                        {cityHotzones.map((item) => (
+                          <option key={item} value={item} className="bg-slate-950 text-white">
+                            {item}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-xs text-amber-200">
+                        Sem pracas habilitadas nesta cidade.
+                      </div>
+                    )}
+                  </label>
+
+                  <label className="space-y-2 text-sm text-slate-300">
+                    <span>Turno desejado</span>
+                    <select
+                      value={turno}
+                      onChange={(event) => setTurno(event.target.value as Shift)}
+                      className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none"
+                    >
+                      {turnoOptions.map((item) => (
                         <option key={item} value={item} className="bg-slate-950 text-white">
                           {item}
                         </option>
                       ))}
                     </select>
-                  ) : (
-                    <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-xs text-amber-200">
-                      Sem pracas habilitadas nesta cidade.
+                  </label>
+
+                  <label className="space-y-2 text-sm text-slate-300">
+                    <span>Data de interesse</span>
+                    <input
+                      type="date"
+                      value={dataFila}
+                      onChange={(event) => setDataFila(event.target.value)}
+                      className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none transition focus:border-[#f97316]/60"
+                    />
+                  </label>
+
+                  <label className="space-y-2 text-sm text-slate-300 md:col-span-2">
+                    <span>Contato (WhatsApp / celular) - opcional</span>
+                    <input
+                      value={contato}
+                      onChange={(event) => setContato(event.target.value)}
+                      placeholder="Ex: (21) 99999-9999"
+                      className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-[#f97316]/60"
+                    />
+                  </label>
+                </div>
+
+                <div className="mt-6 rounded-[28px] border border-[#f59e0b]/25 bg-gradient-to-br from-[#f59e0b]/10 via-[#f97316]/10 to-transparent p-5">
+                  <div className="flex items-start gap-4">
+                    <div className="grid h-10 w-10 flex-none place-items-center rounded-2xl bg-[#f59e0b]/20 text-[#f59e0b]">
+                      <AlertTriangle className="h-5 w-5" />
                     </div>
+                    <div className="space-y-3 text-sm leading-7">
+                      <p className="font-semibold text-[#fde68a]">
+                        Atencao: precisamos de certeza sobre o seu interesse.
+                      </p>
+                      <p className="text-slate-200">
+                        Ao cadastrar este interesse de agenda, voce confirma que esta de
+                        acordo com a data e o turno informados. Caso surja uma oportunidade
+                        na sua hotzone, a equipe {companyName} entrara em contato com voce
+                        para confirmar e seguir com o atendimento.
+                      </p>
+                      <label className="flex items-start gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-slate-200">
+                        <input
+                          type="checkbox"
+                          checked={confirmacaoOk}
+                          onChange={(event) => setConfirmacaoOk(event.target.checked)}
+                          className="mt-0.5 h-4 w-4 rounded border-white/20 bg-white/10 text-[#f97316] focus:ring-[#f97316]"
+                        />
+                        <span>
+                          Tenho certeza do interesse informado e autorizo a equipe {companyName}
+                          a entrar em contato caso haja oportunidade nesta data.
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {formError ? (
+                  <div className="mt-5 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+                    {formError}
+                  </div>
+                ) : null}
+
+                {formSuccess ? (
+                  <div className="mt-5 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+                    {formSuccess}
+                  </div>
+                ) : null}
+
+                {safeError ? (
+                  <div className="mt-5 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+                    {safeError}
+                  </div>
+                ) : null}
+
+                <button
+                  type="submit"
+                  disabled={safeSyncing || safeLoading || cityHotzones.length === 0}
+                  className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#f97316] via-[#fb923c] to-[#f97316] px-5 py-4 text-sm font-semibold text-slate-950 shadow-[0_20px_60px_rgba(249,115,22,0.3)] transition hover:-translate-y-0.5 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {safeSyncing ? (
+                    <>
+                      <LoaderCircle className="h-4 w-4 animate-spin" />
+                      Registrando interesse
+                    </>
+                  ) : (
+                    <>
+                      Cadastrar interesse
+                      <CalendarCheck className="h-4 w-4" />
+                    </>
                   )}
-                </label>
+                </button>
 
-                <label className="space-y-2 text-sm text-slate-300">
-                  <span>Turno desejado</span>
-                  <select
-                    value={turno}
-                    onChange={(event) => setTurno(event.target.value as Shift)}
-                    className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none"
-                  >
-                    {turnoOptions.map((item) => (
-                      <option key={item} value={item} className="bg-slate-950 text-white">
-                        {item}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCpfConfirmado(null);
+                    setCpf("");
+                    stores?.auth.useCompanyAuthStore.getState().logout?.();
+                    navigate(`/c/${slug}/entregador`, { replace: true });
+                  }}
+                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 px-5 py-3 text-sm text-slate-200 transition hover:border-white/20 hover:text-white"
+                >
+                  Usar outro CPF
+                </button>
+              </form>
 
-                <label className="space-y-2 text-sm text-slate-300">
-                  <span>Data de interesse</span>
-                  <input
-                    type="date"
-                    value={dataFila}
-                    onChange={(event) => setDataFila(event.target.value)}
-                    className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none transition focus:border-[#f97316]/60"
-                  />
-                </label>
-
-                <label className="space-y-2 text-sm text-slate-300 md:col-span-2">
-                  <span>Contato (WhatsApp / celular) - opcional</span>
-                  <input
-                    value={contato}
-                    onChange={(event) => setContato(event.target.value)}
-                    placeholder="Ex: (21) 99999-9999"
-                    className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-[#f97316]/60"
-                  />
-                </label>
+              <div className="rounded-[32px] border border-white/10 bg-white/[0.04] p-6">
+                <div className="mb-5 flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.28em] text-slate-500">
+                      Hotzones disponiveis
+                    </p>
+                    <h2 className="mt-2 text-2xl font-semibold text-white">
+                      Pracas da empresa
+                    </h2>
+                  </div>
+                  <p className="text-sm text-slate-400">
+                    Selecionada: {hotzone}
+                  </p>
+                </div>
+                <CompanyHotzoneGrid
+                  city={cidade}
+                  selectedHotzone={hotzone}
+                  queue={safeQueue}
+                  onSelect={setHotzone}
+                  allowedHotzones={hotzoneProp}
+                />
               </div>
 
-              <div className="mt-6 rounded-[28px] border border-[#f59e0b]/25 bg-gradient-to-br from-[#f59e0b]/10 via-[#f97316]/10 to-transparent p-5">
-                <div className="flex items-start gap-4">
-                  <div className="grid h-10 w-10 flex-none place-items-center rounded-2xl bg-[#f59e0b]/20 text-[#f59e0b]">
-                    <AlertTriangle className="h-5 w-5" />
-                  </div>
-                  <div className="space-y-3 text-sm leading-7">
-                    <p className="font-semibold text-[#fde68a]">
-                      Atencao: precisamos de certeza sobre o seu interesse.
-                    </p>
-                    <p className="text-slate-200">
-                      Ao cadastrar este interesse de agenda, voce confirma que esta de
-                      acordo com a data e o turno informados. Caso surja uma oportunidade
-                      na sua hotzone, a equipe {companyName} entrara em contato com voce
-                      para confirmar e seguir com o atendimento.
-                    </p>
-                    <label className="flex items-start gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-slate-200">
-                      <input
-                        type="checkbox"
-                        checked={confirmacaoOk}
-                        onChange={(event) => setConfirmacaoOk(event.target.checked)}
-                        className="mt-0.5 h-4 w-4 rounded border-white/20 bg-white/10 text-[#f97316] focus:ring-[#f97316]"
-                      />
-                      <span>
-                        Tenho certeza do interesse informado e autorizo a equipe {companyName}
-                        a entrar em contato caso haja oportunidade nesta data.
-                      </span>
-                    </label>
-                  </div>
-                </div>
+              <div className="rounded-[32px] border border-white/10 bg-white/[0.04] p-6">
+                <p className="text-xs uppercase tracking-[0.28em] text-slate-500">
+                  Cadastro rapido (opcional)
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold text-white mb-5">
+                  Formulario operacional
+                </h2>
+                <CompanyQueueForm
+                  activeCity={cidade}
+                  selectedHotzone={hotzone}
+                  syncing={safeSyncing}
+                  analystName={nome || "Entregador"}
+                  onSubmit={handleCompanyFormSubmit}
+                  allowedHotzones={hotzoneProp}
+                />
               </div>
-
-              {formError ? (
-                <div className="mt-5 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
-                  {formError}
-                </div>
-              ) : null}
-
-              {formSuccess ? (
-                <div className="mt-5 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
-                  {formSuccess}
-                </div>
-              ) : null}
-
-              {error ? (
-                <div className="mt-5 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
-                  {error}
-                </div>
-              ) : null}
-
-              <button
-                type="submit"
-                disabled={syncing || loading || cityHotzones.length === 0}
-                className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#f97316] via-[#fb923c] to-[#f97316] px-5 py-4 text-sm font-semibold text-slate-950 shadow-[0_20px_60px_rgba(249,115,22,0.3)] transition hover:-translate-y-0.5 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {syncing ? (
-                  <>
-                    <LoaderCircle className="h-4 w-4 animate-spin" />
-                    Registrando interesse
-                  </>
-                ) : (
-                  <>
-                    Cadastrar interesse
-                    <CalendarCheck className="h-4 w-4" />
-                  </>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setCpfConfirmado(null);
-                  setCpf("");
-                  authStore?.getState().logout?.();
-                  navigate(`/c/${slug}/entregador`, { replace: true });
-                }}
-                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 px-5 py-3 text-sm text-slate-200 transition hover:border-white/20 hover:text-white"
-              >
-                Usar outro CPF
-              </button>
-            </form>
+            </div>
 
             <div className="space-y-6">
+              <CompanyQueueFilters
+                filters={safeFilters}
+                onChange={handleChangeFilters}
+                allowedHotzones={hotzoneProp}
+              />
+
               <div className="alx-card rounded-[32px] border border-white/10 p-6 backdrop-blur">
                 <div className="flex items-center justify-between gap-4">
                   <div>

@@ -1,16 +1,24 @@
 import { Filter } from "lucide-react";
 import { hotzonesByCity, shiftOptions } from "@/data/hotzones";
-import type { QueueFilters as QueueFiltersType } from "@/types/queue";
+import type { QueueFilters as QueueFiltersType, Hotzone } from "@/types/queue";
 
-type QueueFiltersProps = {
+type CompanyQueueFiltersProps = {
   filters: QueueFiltersType;
   onChange: (filters: Partial<QueueFiltersType>) => void;
+  allowedHotzones?: Hotzone[];
 };
 
-export function QueueFilters({ filters, onChange }: QueueFiltersProps) {
-  const allHotzones = Array.from(
+export function CompanyQueueFilters({
+  filters,
+  onChange,
+  allowedHotzones,
+}: CompanyQueueFiltersProps) {
+  const globalHotzones = Array.from(
     new Set([...hotzonesByCity["Rio de Janeiro"], ...hotzonesByCity["São Paulo"]]),
   );
+  const allHotzones = allowedHotzones?.length
+    ? globalHotzones.filter((hz) => allowedHotzones.includes(hz as never))
+    : globalHotzones;
 
   return (
     <div className="flex flex-col gap-3 rounded-[28px] border border-white/10 bg-white/5 p-5 lg:flex-row lg:items-center">

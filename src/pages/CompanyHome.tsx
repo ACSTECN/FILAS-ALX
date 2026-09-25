@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import {
   BellElectric,
@@ -16,16 +16,17 @@ import {
 } from "lucide-react";
 import { useCompanyScoped } from "@/hooks/useCompanyScoped";
 import { CitySwitch } from "@/components/CitySwitch";
-import { HotzoneGrid } from "@/components/HotzoneGrid";
-import { AnalystRanking } from "@/components/AnalystRanking";
-import { AnalystHistory } from "@/components/AnalystHistory";
-import { QueueFilters } from "@/components/QueueFilters";
-import { QueueForm } from "@/components/QueueForm";
+import { CompanyHotzoneGrid } from "@/components/CompanyHotzoneGrid";
+import { CompanyAnalystRanking } from "@/components/CompanyAnalystRanking";
+import { CompanyAnalystHistory } from "@/components/CompanyAnalystHistory";
+import { CompanyQueueFilters } from "@/components/CompanyQueueFilters";
+import { CompanyQueueForm } from "@/components/CompanyQueueForm";
 import { QueueList } from "@/components/QueueList";
 import { QueueStats } from "@/components/QueueStats";
 import { hotzonesByCity } from "@/data/hotzones";
 import { hasSupabaseConfig, supabase } from "@/lib/supabase";
-import type { City, QueueFilters as QueueFiltersType } from "@/types/queue";
+import type { City, QueueFilters as QueueFiltersType, QueueFormValues, QueueRecord } from "@/types/queue";
+import type { AnalystUser, AuthUser } from "@/types/auth";
 
 function formatDateBR(date: Date) {
   return date.toLocaleDateString("pt-BR", {
@@ -51,53 +52,97 @@ function getGreetingByHour(hour: number) {
 
 type CompanyTab = "fila" | "ranking" | "historico";
 
+const DEFAULT_FILTERS: QueueFiltersType = {
+  cidade: "Todas",
+  hotzone: "Todas",
+  turno_desejado: "Todos",
+  data_fila: "Todas",
+  origem: "Todas",
+  tipo: "Todas",
+};
+
 export default function CompanyHome() {
   const { slug = "" } = useParams();
   const navigate = useNavigate();
   const { loading, error: companyErr, company, analystUsers, stores } =
     useCompanyScoped(slug);
 
-  const companyAuthStore = stores?.auth.useCompanyAuthStore ?? null;
-  const queueStore = stores?.queue ?? null;
+  const [safeUser, setSafeUser] = useState<AuthUser | null>(null);
+  const [logoutFn, setLogoutFn] = useState<(() => void) | null>(null);
 
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const user = companyAuthStore ? companyAuthStore((s) => s.user) : null;
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const logout = companyAuthStore ? companyAuthStore((s) => s.logout) : null;
+  const [safeQueue, setSafeQueue] = useState<QueueRecord[]>([]);
+  const [safeFilters, setSafeFilters] = useState<QueueFiltersType>(DEFAULT_FILTERS);
+  const [safeLoadingQ, setSafeLoadingQ] = useState<boolean>(true);
+  const [safeSyncing, setSafeSyncing] = useState<boolean>(false);
+  const [safeErrorQ, setSafeErrorQ] = useState<string | null>(null);
+  const [safeAnalystName, setSafeAnalystName] = useState<string>("");
 
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const queue = queueStore ? queueStore((s) => s.queue) : [];
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const filters = queueStore
-    ? queueStore((s) => s.filters)
-    : {
-        cidade: "Todas" as const,
-        hotzone: "Todas" as const,
-        turno_desejado: "Todos" as const,
-        data_fila: "Todas" as const,
-        origem: "Todas" as const,
-        tipo: "Todas" as const,
-      };
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const loadingQ = queueStore ? queueStore((s) => s.loading) : true;
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const syncing = queueStore ? queueStore((s) => s.syncing) : false;
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const errorQ = queueStore ? queueStore((s) => s.error) : null;
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const loadQueue = queueStore ? queueStore((s) => s.loadQueue) : null;
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const setFilters = queueStore ? queueStore((s) => s.setFilters) : null;
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const analystName = queueStore ? queueStore((s) => s.analystName) : "";
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const setAnalystName = queueStore ? queueStore((s) => s.setAnalystName) : null;
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const createRecord = queueStore ? queueStore((s) => s.createRecord) : null;
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const removeRecord = queueStore ? queueStore((s) => s.removeRecord) : null;
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const assignRecord = queueStore ? queueStore((s) => s.assignRecord) : null;
+  const loadQueueRef = useRef<(() => Promise<void>) | null>(null);
+  const setFiltersRef = useRef<((filters: Partial<QueueFiltersType>) => void) | null>(null);
+  const setAnalystNameRef = useRef<((value: string) => void) | null>(null);
+  const createRecordRef = useRef<((values: QueueFormValues) => Promise<void>) | null>(null);
+  const removeRecordRef = useRef<((id: string) => Promise<void>) | null>(null);
+  const assignRecordRef = useRef<((id: string) => Promise<void>) | null>(null);
+
+  useEffect(() => {
+    if (!stores) {
+      setSafeUser(null);
+      setLogoutFn(null);
+      setSafeQueue([]);
+      setSafeFilters(DEFAULT_FILTERS);
+      setSafeLoadingQ(true);
+      setSafeSyncing(false);
+      setSafeErrorQ(null);
+      setSafeAnalystName("");
+      loadQueueRef.current = null;
+      setFiltersRef.current = null;
+      setAnalystNameRef.current = null;
+      createRecordRef.current = null;
+      removeRecordRef.current = null;
+      assignRecordRef.current = null;
+      return;
+    }
+
+    const useAuthStore = stores.auth.useCompanyAuthStore;
+    const useQueueStore = stores.queue;
+
+    const unsubUser = useAuthStore.subscribe((s) => setSafeUser(s.user));
+    setSafeUser(useAuthStore.getState().user);
+    const unsubLogout = useAuthStore.subscribe((s) => setLogoutFn(() => s.logout));
+    setLogoutFn(useAuthStore.getState().logout);
+
+    const unsubQueue = useQueueStore.subscribe((s) => setSafeQueue(s.queue));
+    setSafeQueue(useQueueStore.getState().queue);
+    const unsubFilters = useQueueStore.subscribe((s) => setSafeFilters(s.filters));
+    setSafeFilters(useQueueStore.getState().filters);
+    const unsubLoading = useQueueStore.subscribe((s) => setSafeLoadingQ(s.loading));
+    setSafeLoadingQ(useQueueStore.getState().loading);
+    const unsubSyncing = useQueueStore.subscribe((s) => setSafeSyncing(s.syncing));
+    setSafeSyncing(useQueueStore.getState().syncing);
+    const unsubError = useQueueStore.subscribe((s) => setSafeErrorQ(s.error));
+    setSafeErrorQ(useQueueStore.getState().error);
+    const unsubAnalystName = useQueueStore.subscribe((s) => setSafeAnalystName(s.analystName));
+    setSafeAnalystName(useQueueStore.getState().analystName);
+
+    const state = useQueueStore.getState();
+    loadQueueRef.current = state.loadQueue;
+    setFiltersRef.current = state.setFilters;
+    setAnalystNameRef.current = state.setAnalystName;
+    createRecordRef.current = state.createRecord;
+    removeRecordRef.current = state.removeRecord;
+    assignRecordRef.current = state.assignRecord;
+
+    return () => {
+      unsubUser();
+      unsubLogout();
+      unsubQueue();
+      unsubFilters();
+      unsubLoading();
+      unsubSyncing();
+      unsubError();
+      unsubAnalystName();
+    };
+  }, [stores]);
 
   const [now, setNow] = useState<Date>(new Date());
 
@@ -131,42 +176,42 @@ export default function CompanyHome() {
   const [activeCity, setActiveCity] = useState<City>("Rio de Janeiro");
   const [selectedHotzone, setSelectedHotzone] = useState<City extends keyof typeof hotzonesByCity ? (typeof hotzonesByCity)[City][number] : never>(() => hotzonesByCity["Rio de Janeiro"][0]);
 
-  const userName = user?.analystName ?? user?.identifier ?? "Usuario";
+  const userName = safeUser?.analystName ?? safeUser?.identifier ?? "Usuario";
   const greeting = getGreetingByHour(now.getHours());
   const dateLabel = formatDateBR(now);
   const timeLabel = formatTimeBR(now);
 
   const filteredQueue = useMemo(() => {
-    return queue.filter((record) => {
-      const byCity = filters.cidade === "Todas" || record.cidade === filters.cidade;
+    return safeQueue.filter((record) => {
+      const byCity = safeFilters.cidade === "Todas" || record.cidade === safeFilters.cidade;
       const byHotzone =
-        filters.hotzone === "Todas" || record.hotzone === filters.hotzone;
+        safeFilters.hotzone === "Todas" || record.hotzone === safeFilters.hotzone;
       const byShift =
-        filters.turno_desejado === "Todos" ||
-        record.turno_desejado === filters.turno_desejado;
+        safeFilters.turno_desejado === "Todos" ||
+        record.turno_desejado === safeFilters.turno_desejado;
       const byDate =
-        filters.data_fila === "Todas" || record.data_fila === filters.data_fila;
+        safeFilters.data_fila === "Todas" || record.data_fila === safeFilters.data_fila;
       const byOrigem =
-        filters.origem === "Todas" || record.origem === filters.origem;
-      const byTipo = filters.tipo === "Todas" || record.tipo === filters.tipo;
+        safeFilters.origem === "Todas" || record.origem === safeFilters.origem;
+      const byTipo = safeFilters.tipo === "Todas" || record.tipo === safeFilters.tipo;
 
       return byCity && byHotzone && byShift && byDate && byOrigem && byTipo;
     });
-  }, [filters, queue]);
+  }, [safeFilters, safeQueue]);
 
-  const analistaOverride = useMemo(
+  const analistaOverride: AnalystUser | null = useMemo(
     () =>
-      analystUsers.find((a) => a.id === user?.analystId) ??
-      (user?.analystName
+      analystUsers.find((a) => a.id === safeUser?.analystId) ??
+      (safeUser?.analystName
         ? {
-            id: user.analystId ?? user.identifier,
+            id: safeUser.analystId ?? safeUser.identifier,
             role: "operacional" as const,
-            name: user.analystName,
-            initials: user.analystInitials ?? userName.slice(0, 2).toUpperCase(),
+            name: safeUser.analystName,
+            initials: safeUser.analystInitials ?? userName.slice(0, 2).toUpperCase(),
             password: "",
           }
         : null),
-    [analystUsers, user, userName],
+    [analystUsers, safeUser, userName],
   );
 
   useEffect(() => {
@@ -181,13 +226,13 @@ export default function CompanyHome() {
   }, []);
 
   useEffect(() => {
-    if (loadQueue) {
-      void loadQueue();
+    if (loadQueueRef.current) {
+      void loadQueueRef.current();
     }
-  }, [loadQueue]);
+  }, [stores]);
 
   useEffect(() => {
-    if (!company || !loadQueue) return;
+    if (!company || !loadQueueRef.current) return;
     if (!hasSupabaseConfig) return;
     if (!supabase) return;
     const suffix = company.id.slice(0, 8);
@@ -197,14 +242,14 @@ export default function CompanyHome() {
         "postgres_changes",
         { event: "*", schema: "public", table: "fila_registros" },
         () => {
-          void loadQueue();
+          if (loadQueueRef.current) void loadQueueRef.current();
         },
       )
       .subscribe();
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [company, loadQueue]);
+  }, [company, stores]);
 
   if (loading || !company) {
     return (
@@ -246,7 +291,7 @@ export default function CompanyHome() {
     );
   }
 
-  if (!user || user.role !== "operacional") {
+  if (!safeUser || safeUser.role !== "operacional") {
     return <Navigate to={`/c/${slug}/login`} replace />;
   }
 
@@ -256,11 +301,11 @@ export default function CompanyHome() {
   };
 
   const changeFilters = (nextFilters: Partial<QueueFiltersType>) => {
-    if (setFilters) setFilters(nextFilters);
+    if (setFiltersRef.current) setFiltersRef.current(nextFilters);
   };
 
   const handleAssign = async (id: string) => {
-    if (assignRecord) await assignRecord(id);
+    if (assignRecordRef.current) await assignRecordRef.current(id);
   };
 
   const hotzoneProp = (company.allowed_hotzones?.length ?? 0) > 0
@@ -410,7 +455,7 @@ export default function CompanyHome() {
                 <button
                   type="button"
                   onClick={() => {
-                    if (logout) logout();
+                    if (logoutFn) logoutFn();
                     navigate(`/c/${slug}/login`, { replace: true });
                   }}
                   className="mt-1 inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 px-4 py-3 text-sm text-slate-200 transition hover:border-white/20 hover:text-white"
@@ -441,7 +486,7 @@ export default function CompanyHome() {
         </div>
 
         <div className="mt-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <QueueStats activeCity={activeCity} queue={queue} />
+          <QueueStats activeCity={activeCity} queue={safeQueue} />
           {availableTabs.length > 0 && (
             <div className="flex items-center gap-2 self-start rounded-[22px] border border-white/10 bg-white/5 p-2">
               {availableTabs.map((tab) => (
@@ -462,24 +507,24 @@ export default function CompanyHome() {
           )}
         </div>
 
-        {errorQ ? (
+        {safeErrorQ ? (
           <div className="mt-6 rounded-[24px] border border-rose-500/20 bg-rose-500/10 px-5 py-4 text-sm text-rose-100">
-            {errorQ}
+            {safeErrorQ}
           </div>
         ) : null}
 
         {activeTab === "ranking" && features.enableRanking ? (
           <div className="mt-6">
-            <AnalystRanking
+            <CompanyAnalystRanking
               companyId={company.id}
               analystsList={analystUsers}
             />
           </div>
         ) : activeTab === "historico" && features.enableHistorico ? (
           <div className="mt-6">
-            <AnalystHistory
+            <CompanyAnalystHistory
               companyId={company.id}
-              selectedAnalystOverride={analistaOverride ?? undefined}
+              selectedAnalyst={analistaOverride}
             />
           </div>
         ) : features.enableFila ? (
@@ -499,25 +544,25 @@ export default function CompanyHome() {
                     Hotzone selecionada: {selectedHotzone}
                   </p>
                 </div>
-                <HotzoneGrid
+                <CompanyHotzoneGrid
                   city={activeCity}
                   selectedHotzone={selectedHotzone}
-                  queue={queue}
+                  queue={safeQueue}
                   onSelect={setSelectedHotzone}
                   allowedHotzones={hotzoneProp}
                 />
               </div>
 
-              <QueueFilters
-                filters={filters}
+              <CompanyQueueFilters
+                filters={safeFilters}
                 onChange={changeFilters}
                 allowedHotzones={hotzoneProp}
               />
               <QueueList
                 records={filteredQueue}
-                loading={loadingQ}
-                syncing={syncing}
-                onRemove={removeRecord ?? (async () => {})}
+                loading={safeLoadingQ}
+                syncing={safeSyncing}
+                onRemove={removeRecordRef.current ?? (async () => {})}
                 onAssign={handleAssign}
               />
             </section>
@@ -529,8 +574,8 @@ export default function CompanyHome() {
                 </p>
                 <h3 className="mt-3 text-xl font-semibold text-white">Analista</h3>
                 <input
-                  value={analystName}
-                  onChange={(event) => setAnalystName?.(event.target.value)}
+                  value={safeAnalystName}
+                  onChange={(event) => setAnalystNameRef.current?.(event.target.value)}
                   placeholder="Digite seu nome (analista)"
                   className="alx-field mt-5 w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-[#a78bfa]/60"
                 />
@@ -539,12 +584,12 @@ export default function CompanyHome() {
                   quando for atribuido).
                 </p>
               </div>
-              <QueueForm
+              <CompanyQueueForm
                 activeCity={activeCity}
                 selectedHotzone={selectedHotzone}
-                syncing={syncing}
-                analystName={analystName}
-                onSubmit={createRecord ?? (async () => {})}
+                syncing={safeSyncing}
+                analystName={safeAnalystName}
+                onSubmit={createRecordRef.current ?? (async () => {})}
                 allowedHotzones={hotzoneProp}
               />
             </aside>

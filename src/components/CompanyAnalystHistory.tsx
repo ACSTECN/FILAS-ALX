@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { History, MapPin, UsersRound } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { useAuthStore } from "@/store/authStore";
 import type { City, QueueRecord } from "@/types/queue";
 import type { UnifiedItemKind } from "@/types/unified";
-import { ANALYST_USERS, formatCPF } from "@/types/auth";
+import { formatCPF, type AnalystUser } from "@/types/auth";
 
 type CityFilter = City | "Todas";
 type KindFilter = UnifiedItemKind | "Todas";
@@ -67,17 +66,19 @@ function applyCommonFilters({
   kind,
   dateFilter,
   statusOverride,
+  companyId,
 }: {
   query: AnyFilter;
   city: CityFilter;
   kind: KindFilter;
   dateFilter: ReturnType<typeof buildDateFilter>;
   statusOverride?: readonly string[];
+  companyId: string;
 }) {
   const statuses = statusOverride ?? statusListByKind(kind);
   query = query
     .in("status", statuses as unknown as string[])
-    .is("company_id", null);
+    .eq("company_id", companyId);
 
   if (city !== "Todas") {
     query = query.eq("cidade", city);
@@ -153,8 +154,14 @@ function sortByLatest(list: QueueRecord[]) {
   });
 }
 
-export function AnalystHistory() {
-  const user = useAuthStore((state) => state.user);
+export function CompanyAnalystHistory({
+  companyId,
+  selectedAnalyst,
+}: {
+  companyId: string;
+  selectedAnalyst: AnalystUser | null;
+  authStoreSelector?: unknown;
+}) {
   const [city, setCity] = useState<CityFilter>("Todas");
   const [kind, setKind] = useState<KindFilter>("Todas");
   const [month, setMonth] = useState<string>("all");
@@ -165,10 +172,6 @@ export function AnalystHistory() {
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<QueueRecord[]>([]);
   const [summary, setSummary] = useState<HistorySummary>({ total: 0, atribuidos: 0, retirados: 0 });
-
-  const selectedAnalyst = useMemo(() => {
-    return ANALYST_USERS.find((item) => item.id === user?.analystId) ?? null;
-  }, [user]);
 
   const loadHistory = useCallback(async () => {
     setLoading(true);
@@ -205,6 +208,7 @@ export function AnalystHistory() {
       kind,
       dateFilter,
       statusOverride: STATUS_ATRIBUIDOS,
+      companyId,
     });
     const baseCountRetir = applyCommonFilters({
       query: baseFor({ count: "exact", head: true })
@@ -214,6 +218,7 @@ export function AnalystHistory() {
       kind,
       dateFilter,
       statusOverride: STATUS_RETIRADOS,
+      companyId,
     });
     const baseRows = applyCommonFilters({
       query: baseFor()
@@ -222,6 +227,7 @@ export function AnalystHistory() {
       city,
       kind,
       dateFilter,
+      companyId,
     });
 
     const [atribRes, retirRes, rowsRes] = await Promise.all([
@@ -242,7 +248,7 @@ export function AnalystHistory() {
     setRows(sortByLatest((rowsRes.data ?? []) as QueueRecord[]));
     setSummary({ total: atribuidos + retirados, atribuidos, retirados });
     setLoading(false);
-  }, [selectedAnalyst, city, kind, month, year, day]);
+  }, [companyId, selectedAnalyst, city, kind, month, year, day]);
 
   useEffect(() => {
     void loadHistory();
@@ -254,7 +260,7 @@ export function AnalystHistory() {
     }
 
     const channel = supabase
-      .channel(`fila-registros-history-alx`)
+      .channel(`fila-registros-history-${companyId.slice(0, 8)}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "fila_registros" },
@@ -267,7 +273,7 @@ export function AnalystHistory() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [loadHistory]);
+  }, [loadHistory, companyId]);
 
   const { total: totalRegistros, atribuidos: totalAtribuidos, retirados: totalRetirados } = summary;
 
@@ -280,12 +286,12 @@ export function AnalystHistory() {
               Historico
             </p>
             <h2 className="mt-2 text-2xl font-semibold text-white">
-              Meu historico de atribuicoes
+              Historico de atribuicoes da empresa
             </h2>
             <p className="mt-2 text-sm text-slate-400">
               {selectedAnalyst
-                ? `${selectedAnalyst.name} · Somente os seus registros aparecem aqui.`
-                : "Historico pessoal por analista."}
+                ? `${selectedAnalyst.name} · Registros da empresa.`
+                : "Historico por analista da empresa."}
             </p>
           </div>
 
@@ -413,7 +419,7 @@ export function AnalystHistory() {
 
       <div className="alx-card rounded-[32px] border border-white/10 p-6 backdrop-blur">
         <div className="mb-5 flex items-center justify-between">
-          <p className="text-sm font-semibold text-white">Meus registros</p>
+          <p className="text-sm font-semibold text-white">Registros da empresa</p>
           <p className="text-sm text-slate-400">
             {loading ? "Carregando..." : `${rows.length} registros`}
           </p>

@@ -3,24 +3,43 @@ import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom"
 import { LogIn, LoaderCircle, RadioTower, ShieldAlert, UserRound } from "lucide-react";
 import { useCompanyScoped } from "@/hooks/useCompanyScoped";
 import { Building2 } from "lucide-react";
+import type { AuthUser, AnalystUser } from "@/types/auth";
 
 export default function CompanyLogin() {
   const { slug = "" } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const { loading, error: companyErr, company, stores } = useCompanyScoped(slug);
+  const { loading, error: companyErr, company, stores, analystUsers } = useCompanyScoped(slug);
 
-  const authStore = stores?.auth.useCompanyAuthStore;
-  const user = authStore ? authStore((s) => s.user) : null;
-  const loginError = authStore ? authStore((s) => s.loginError) : null;
-  const loginOperacional = authStore ? authStore((s) => s.loginOperacional) : null;
+  const [safeUser, setSafeUser] = useState<AuthUser | null>(null);
+  const [safeLoginError, setSafeLoginError] = useState<string | null>(null);
+  const [loginOperacionalFn, setLoginOperacionalFn] = useState<
+    ((name: string, password: string) => Promise<boolean>) | null
+  >(null);
+
+  useEffect(() => {
+    if (!stores) {
+      setSafeUser(null);
+      setSafeLoginError(null);
+      setLoginOperacionalFn(null);
+      return;
+    }
+    const useStore = stores.auth.useCompanyAuthStore;
+    const unsubscribe = useStore.subscribe((state) => {
+      setSafeUser(state.user);
+      setSafeLoginError(state.loginError);
+    });
+    setSafeUser(useStore.getState().user);
+    setSafeLoginError(useStore.getState().loginError);
+    setLoginOperacionalFn(() => useStore.getState().loginOperacional);
+    return () => unsubscribe();
+  }, [stores]);
 
   const [analystName, setAnalystName] = useState<string>("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const usersList = useCompanyScoped(slug);
-  const analysts = usersList.analystUsers;
+  const analysts: AnalystUser[] = analystUsers;
 
   useEffect(() => {
     if (analysts.length > 0 && !analystName) {
@@ -38,19 +57,19 @@ export default function CompanyLogin() {
     [slug],
   );
 
-  if (user?.role === "operacional") {
+  if (safeUser?.role === "operacional") {
     return <Navigate to={from ?? homePath} replace />;
   }
-  if (user?.role === "entregador") {
+  if (safeUser?.role === "entregador") {
     return <Navigate to={entregadorPath} replace />;
   }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!loginOperacional) return;
+    if (!loginOperacionalFn) return;
     setSubmitting(true);
     try {
-      const ok = await loginOperacional(analystName, password);
+      const ok = await loginOperacionalFn(analystName, password);
       if (ok) navigate(from ?? homePath, { replace: true });
     } finally {
       setSubmitting(false);
@@ -188,9 +207,9 @@ export default function CompanyLogin() {
               />
             </label>
 
-            {loginError ? (
+            {safeLoginError ? (
               <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
-                {loginError}
+                {safeLoginError}
               </div>
             ) : null}
 

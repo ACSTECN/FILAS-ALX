@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Crown, History, Sparkles, UsersRound, MapPin } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { ANALYST_USERS } from "@/types/auth";
+import { type AnalystUser } from "@/types/auth";
 import type { City } from "@/types/queue";
 import type { UnifiedItemKind } from "@/types/unified";
 
@@ -30,6 +30,11 @@ type KindFilter = UnifiedItemKind | "Todas";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFilter = any;
+
+type CompanyAnalystRankingProps = {
+  companyId: string;
+  analystsList: AnalystUser[];
+};
 
 function colorFromName(name: string) {
   let hash = 0;
@@ -113,18 +118,20 @@ function applyFiltersToCountQuery({
   city,
   dateFilter,
   statuses,
+  companyId,
 }: {
   query: AnyFilter;
   analystName: string;
   city: CityFilter;
   dateFilter: ReturnType<typeof buildDateFilter>;
   statuses: readonly string[];
+  companyId: string;
 }) {
   query = query
     .not("analista", "is", null)
     .ilike("analista", analystName)
     .in("status", statuses as unknown as string[])
-    .is("company_id", null);
+    .eq("company_id", companyId);
 
   if (city !== "Todas") {
     query = query.eq("cidade", city);
@@ -148,11 +155,13 @@ async function countByAnalyst({
   statuses,
   city,
   dateFilter,
+  companyId,
 }: {
   analystName: string;
   statuses: readonly string[];
   city: CityFilter;
   dateFilter: ReturnType<typeof buildDateFilter>;
+  companyId: string;
 }) {
   if (!supabase) return 0;
   const { count, error } = await applyFiltersToCountQuery({
@@ -163,6 +172,7 @@ async function countByAnalyst({
     city,
     dateFilter,
     statuses,
+    companyId,
   });
 
   if (error) {
@@ -171,7 +181,7 @@ async function countByAnalyst({
   return Number(count ?? 0);
 }
 
-export function AnalystRanking() {
+export function CompanyAnalystRanking({ companyId, analystsList }: CompanyAnalystRankingProps) {
   const [city, setCity] = useState<CityFilter>("Todas");
   const [kind, setKind] = useState<KindFilter>("Todas");
   const [month, setMonth] = useState<string>("all");
@@ -201,19 +211,21 @@ export function AnalystRanking() {
       return;
     }
 
-    const analysts = ANALYST_USERS;
+    const analysts = analystsList;
     const promises = analysts.flatMap((a) => [
       countByAnalyst({
         analystName: a.name,
         statuses: statusesA,
         city,
         dateFilter,
+        companyId,
       }),
       countByAnalyst({
         analystName: a.name,
         statuses: statusesR,
         city,
         dateFilter,
+        companyId,
       }),
     ]);
 
@@ -234,7 +246,7 @@ export function AnalystRanking() {
 
     setRows(built.sort((a, b) => b.total - a.total || a.analista.localeCompare(b.analista)));
     setLoading(false);
-  }, [statusesA, statusesR, city, dateFilter]);
+  }, [statusesA, statusesR, city, dateFilter, analystsList, companyId]);
 
   useEffect(() => {
     void loadRanking();
@@ -246,7 +258,7 @@ export function AnalystRanking() {
     }
 
     const channel = supabase
-      .channel(`fila-registros-ranking-alx`)
+      .channel(`fila-registros-ranking-${companyId.slice(0, 8)}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "fila_registros" },
@@ -259,7 +271,7 @@ export function AnalystRanking() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [loadRanking]);
+  }, [loadRanking, companyId]);
 
   const totalAtribuidos = useMemo(
     () => rows.reduce((sum, row) => sum + row.totalAtribuidos, 0),

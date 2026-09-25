@@ -3,20 +3,24 @@ import { hotzonesByCity } from "@/data/hotzones";
 import { cn } from "@/lib/utils";
 import type { City, Hotzone, QueueRecord } from "@/types/queue";
 
-type HotzoneGridProps = {
+type CompanyHotzoneGridProps = {
   city: City;
   selectedHotzone: Hotzone;
   queue: QueueRecord[];
   onSelect: (hotzone: Hotzone) => void;
+  allowedHotzones?: Hotzone[];
 };
 
-export function HotzoneGrid({
+export function CompanyHotzoneGrid({
   city,
   selectedHotzone,
   queue,
   onSelect,
-}: HotzoneGridProps) {
-  const hotzonesInCity = hotzonesByCity[city];
+  allowedHotzones,
+}: CompanyHotzoneGridProps) {
+  const hotzonesInCity = allowedHotzones?.length
+    ? hotzonesByCity[city].filter((hz) => allowedHotzones.includes(hz))
+    : hotzonesByCity[city];
 
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

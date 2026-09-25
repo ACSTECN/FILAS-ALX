@@ -4,21 +4,23 @@ import { hotzonesByCity, shiftOptions } from "@/data/hotzones";
 import type { AssignmentKind, City, Hotzone, QueueFormValues, Shift } from "@/types/queue";
 import { formatCPF, normalizeCPF } from "@/types/auth";
 
-type QueueFormProps = {
+type CompanyQueueFormProps = {
   activeCity: City;
   selectedHotzone: Hotzone;
   syncing: boolean;
   analystName: string;
   onSubmit: (values: QueueFormValues) => Promise<void>;
+  allowedHotzones?: Hotzone[];
 };
 
-export function QueueForm({
+export function CompanyQueueForm({
   activeCity,
   selectedHotzone,
   syncing,
   analystName,
   onSubmit,
-}: QueueFormProps) {
+  allowedHotzones,
+}: CompanyQueueFormProps) {
   const [codigo, setCodigo] = useState("");
   const [cpf, setCpf] = useState("");
   const [nome, setNome] = useState("");
@@ -27,7 +29,12 @@ export function QueueForm({
   const [dataFila, setDataFila] = useState(() => new Date().toISOString().slice(0, 10));
   const [formError, setFormError] = useState<string | null>(null);
 
-  const cityHotzones = useMemo(() => hotzonesByCity[activeCity], [activeCity]);
+  const cityHotzones = useMemo(() => {
+    const list = hotzonesByCity[activeCity];
+    return allowedHotzones?.length
+      ? list.filter((hz) => allowedHotzones.includes(hz))
+      : list;
+  }, [activeCity, allowedHotzones]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

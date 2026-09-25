@@ -113,10 +113,10 @@ export default function CompanyLogin() {
     [slug],
   );
 
-  if (safeUser?.role === "operacional") {
+  if (!loading && stores && safeUser?.role === "operacional") {
     return <Navigate to={from ?? homePath} replace />;
   }
-  if (safeUser?.role === "entregador") {
+  if (!loading && stores && safeUser?.role === "entregador") {
     return <Navigate to={entregadorPath} replace />;
   }
 

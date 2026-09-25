@@ -128,7 +128,7 @@ export default function CompanyHome() {
   useEffect(() => {
     if (!stores) {
       setSafeUser(null);
-      setAuthHydrated(true);
+      setAuthHydrated(false);
       setLogoutFn(null);
       setSafeQueue([]);
       setSafeFilters(DEFAULT_FILTERS);

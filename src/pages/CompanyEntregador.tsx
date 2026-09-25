@@ -115,7 +115,7 @@ export default function CompanyEntregador() {
   useEffect(() => {
     if (!stores) {
       setSafeAuthUser(null);
-      setAuthHydrated(true);
+      setAuthHydrated(false);
       safeLoginEntregadorRef.current = null;
       setSafeLoginError(null);
       setSafeQueue([]);

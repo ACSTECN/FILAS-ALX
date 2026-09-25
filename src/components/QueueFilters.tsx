@@ -5,12 +5,16 @@ import type { QueueFilters as QueueFiltersType } from "@/types/queue";
 type QueueFiltersProps = {
   filters: QueueFiltersType;
   onChange: (filters: Partial<QueueFiltersType>) => void;
+  allowedHotzones?: import("@/types/queue").Hotzone[];
 };
 
-export function QueueFilters({ filters, onChange }: QueueFiltersProps) {
-  const allHotzones = Array.from(
+export function QueueFilters({ filters, onChange, allowedHotzones }: QueueFiltersProps) {
+  const globalHotzones = Array.from(
     new Set([...hotzonesByCity["Rio de Janeiro"], ...hotzonesByCity["São Paulo"]]),
   );
+  const allHotzones = allowedHotzones?.length
+    ? globalHotzones.filter((hz) => allowedHotzones.includes(hz as never))
+    : globalHotzones;
 
   return (
     <div className="flex flex-col gap-3 rounded-[28px] border border-white/10 bg-white/5 p-5 lg:flex-row lg:items-center">
@@ -55,7 +59,7 @@ export function QueueFilters({ filters, onChange }: QueueFiltersProps) {
             .filter((hotzone) =>
               filters.cidade === "Todas"
                 ? true
-                : hotzonesByCity[filters.cidade].includes(hotzone),
+                : hotzonesByCity[filters.cidade].includes(hotzone as never),
             )
             .map((hotzone) => (
               <option key={hotzone} value={hotzone} className="bg-slate-950 text-white">

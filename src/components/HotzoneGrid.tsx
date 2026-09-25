@@ -8,6 +8,7 @@ type HotzoneGridProps = {
   selectedHotzone: Hotzone;
   queue: QueueRecord[];
   onSelect: (hotzone: Hotzone) => void;
+  allowedHotzones?: Hotzone[];
 };
 
 export function HotzoneGrid({
@@ -15,10 +16,15 @@ export function HotzoneGrid({
   selectedHotzone,
   queue,
   onSelect,
+  allowedHotzones,
 }: HotzoneGridProps) {
+  const hotzonesInCity = allowedHotzones?.length
+    ? hotzonesByCity[city].filter((hz) => allowedHotzones.includes(hz))
+    : hotzonesByCity[city];
+
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      {hotzonesByCity[city].map((hotzone) => {
+      {hotzonesInCity.map((hotzone) => {
         const count = queue.filter((item) => item.hotzone === hotzone).length;
         const active = selectedHotzone === hotzone;
 

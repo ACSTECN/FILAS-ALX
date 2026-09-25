@@ -10,6 +10,7 @@ type QueueFormProps = {
   syncing: boolean;
   analystName: string;
   onSubmit: (values: QueueFormValues) => Promise<void>;
+  allowedHotzones?: Hotzone[];
 };
 
 export function QueueForm({
@@ -18,6 +19,7 @@ export function QueueForm({
   syncing,
   analystName,
   onSubmit,
+  allowedHotzones,
 }: QueueFormProps) {
   const [codigo, setCodigo] = useState("");
   const [cpf, setCpf] = useState("");
@@ -27,7 +29,12 @@ export function QueueForm({
   const [dataFila, setDataFila] = useState(() => new Date().toISOString().slice(0, 10));
   const [formError, setFormError] = useState<string | null>(null);
 
-  const cityHotzones = useMemo(() => hotzonesByCity[activeCity], [activeCity]);
+  const cityHotzones = useMemo(() => {
+    const list = hotzonesByCity[activeCity];
+    return allowedHotzones?.length
+      ? list.filter((hz) => allowedHotzones.includes(hz))
+      : list;
+  }, [activeCity, allowedHotzones]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

@@ -1,4 +1,4 @@
-export type UserRole = "operacional" | "entregador";
+export type UserRole = "operacional" | "entregador" | "platform_admin";
 
 export type AnalystUser = {
   id: string;
@@ -11,9 +11,12 @@ export type AnalystUser = {
 export type AuthUser = {
   role: UserRole;
   identifier: string;
+  companyId?: string | null;
+  companySlug?: string | null;
   analystId?: string;
   analystName?: string;
   analystInitials?: string;
+  displayName?: string;
 };
 
 export const ANALYST_USERS: AnalystUser[] = [

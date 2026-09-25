@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/store/authStore";
 import type { City, QueueRecord } from "@/types/queue";
 import type { UnifiedItemKind } from "@/types/unified";
-import { ANALYST_USERS, formatCPF } from "@/types/auth";
+import { ANALYST_USERS, formatCPF, type AnalystUser } from "@/types/auth";
 
 type CityFilter = City | "Todas";
 type KindFilter = UnifiedItemKind | "Todas";
@@ -67,15 +67,23 @@ function applyCommonFilters({
   kind,
   dateFilter,
   statusOverride,
+  companyId,
 }: {
   query: AnyFilter;
   city: CityFilter;
   kind: KindFilter;
   dateFilter: ReturnType<typeof buildDateFilter>;
   statusOverride?: readonly string[];
+  companyId?: string | null;
 }) {
   const statuses = statusOverride ?? statusListByKind(kind);
   query = query.in("status", statuses as unknown as string[]);
+
+  if (companyId) {
+    query = query.eq("company_id", companyId);
+  } else {
+    query = query.is("company_id", null);
+  }
 
   if (city !== "Todas") {
     query = query.eq("cidade", city);
@@ -151,7 +159,15 @@ function sortByLatest(list: QueueRecord[]) {
   });
 }
 
-export function AnalystHistory() {
+type AnalystHistoryProps = {
+  companyId?: string | null;
+  selectedAnalystOverride?: AnalystUser | null;
+};
+
+export function AnalystHistory({
+  companyId = null,
+  selectedAnalystOverride,
+}: AnalystHistoryProps = {}) {
   const user = useAuthStore((state) => state.user);
   const [city, setCity] = useState<CityFilter>("Todas");
   const [kind, setKind] = useState<KindFilter>("Todas");
@@ -164,10 +180,10 @@ export function AnalystHistory() {
   const [rows, setRows] = useState<QueueRecord[]>([]);
   const [summary, setSummary] = useState<HistorySummary>({ total: 0, atribuidos: 0, retirados: 0 });
 
-  const selectedAnalyst = useMemo(
-    () => ANALYST_USERS.find((item) => item.id === user?.analystId) ?? null,
-    [user],
-  );
+  const selectedAnalyst = useMemo(() => {
+    if (selectedAnalystOverride !== undefined) return selectedAnalystOverride;
+    return ANALYST_USERS.find((item) => item.id === user?.analystId) ?? null;
+  }, [selectedAnalystOverride, user]);
 
   const loadHistory = useCallback(async () => {
     setLoading(true);
@@ -204,6 +220,7 @@ export function AnalystHistory() {
       kind,
       dateFilter,
       statusOverride: STATUS_ATRIBUIDOS,
+      companyId,
     });
     const baseCountRetir = applyCommonFilters({
       query: baseFor({ count: "exact", head: true })
@@ -213,6 +230,7 @@ export function AnalystHistory() {
       kind,
       dateFilter,
       statusOverride: STATUS_RETIRADOS,
+      companyId,
     });
     const baseRows = applyCommonFilters({
       query: baseFor()
@@ -221,6 +239,7 @@ export function AnalystHistory() {
       city,
       kind,
       dateFilter,
+      companyId,
     });
 
     const [atribRes, retirRes, rowsRes] = await Promise.all([
@@ -241,7 +260,7 @@ export function AnalystHistory() {
     setRows(sortByLatest((rowsRes.data ?? []) as QueueRecord[]));
     setSummary({ total: atribuidos + retirados, atribuidos, retirados });
     setLoading(false);
-  }, [selectedAnalyst, city, kind, month, year, day]);
+  }, [selectedAnalyst, city, kind, month, year, day, companyId]);
 
   useEffect(() => {
     void loadHistory();
@@ -252,8 +271,9 @@ export function AnalystHistory() {
       return;
     }
 
+    const channelSuffix = companyId ? `-${companyId.slice(0, 8)}` : "-alx";
     const channel = supabase
-      .channel("fila-registros-history")
+      .channel(`fila-registros-history${channelSuffix}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "fila_registros" },
@@ -266,7 +286,7 @@ export function AnalystHistory() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [loadHistory]);
+  }, [loadHistory, companyId]);
 
   const { total: totalRegistros, atribuidos: totalAtribuidos, retirados: totalRetirados } = summary;
 

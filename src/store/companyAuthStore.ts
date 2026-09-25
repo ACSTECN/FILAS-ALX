@@ -88,11 +88,15 @@ export function makeCompanyAuthStores(slug: string, companyId: string) {
           key: cleanPass,
           value: row.password_hash,
         } as never);
-        if (!cryptErr) {
+        if (!cryptErr && cryptData != null) {
           matches = String(cryptData ?? "") === String(row.password_hash);
         }
       } catch {
         matches = false;
+      }
+
+      if (!matches) {
+        matches = String(row.password_hash ?? "").trim() === cleanPass;
       }
 
       if (!matches) {

@@ -10,7 +10,10 @@ export type Company = {
   id: string;
   slug: string;
   name: string;
+  display_name: string | null;
   logo_url: string | null;
+  favicon_url: string | null;
+  primary_color: string | null;
   is_active: boolean;
   max_users: number;
   enable_fila: boolean;
@@ -33,7 +36,10 @@ export type CompanyUser = {
 export type CompanyUpsertValues = {
   slug: string;
   name: string;
+  display_name?: string | null;
   logo_url?: string | null;
+  favicon_url?: string | null;
+  primary_color?: string | null;
   is_active?: boolean;
   max_users?: number;
   enable_fila?: boolean;

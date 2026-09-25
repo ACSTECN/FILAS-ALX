@@ -67,6 +67,46 @@ export default function CompanyHome() {
   const { loading, error: companyErr, company, analystUsers, stores } =
     useCompanyScoped(slug);
 
+  const originalMetaRef = useRef<{ title: string } | null>(null);
+  if (!originalMetaRef.current && typeof document !== "undefined") {
+    originalMetaRef.current = { title: document.title };
+  }
+
+  const companyLogo = company?.logo_url ?? null;
+  const companyDisplayName = company?.display_name?.trim() || company?.name || "";
+  const companyPrimaryColor = company?.primary_color?.trim() || null;
+  const companyFavicon = company?.favicon_url?.trim() || null;
+
+  useEffect(() => {
+    if (!company) return;
+    const doc = document;
+    const root = doc.documentElement;
+    const originalTitle = originalMetaRef.current?.title ?? doc.title;
+    doc.title = `${companyDisplayName} | Painel`;
+    if (companyPrimaryColor) { root.style.setProperty("--company-primary", companyPrimaryColor); }
+    else { root.style.removeProperty("--company-primary"); }
+    const existingIcons = Array.from(doc.querySelectorAll("link[rel~='icon'], link[rel~='shortcut icon']")) as HTMLLinkElement[];
+    existingIcons.forEach((el) => el.remove());
+    if (companyFavicon) {
+      const link = doc.createElement("link");
+      link.rel = "icon"; link.href = companyFavicon;
+      doc.head.appendChild(link);
+    }
+    return () => {
+      doc.title = originalTitle;
+      root.style.removeProperty("--company-primary");
+      const added = doc.querySelectorAll("link[rel~='icon'], link[rel~='shortcut icon']");
+      added.forEach((el) => el.remove());
+      const defaultFav = doc.createElement("link");
+      defaultFav.rel = "icon"; defaultFav.type = "image/png"; defaultFav.href = "/logofilas.png";
+      doc.head.appendChild(defaultFav);
+    };
+  }, [company, companyDisplayName, companyPrimaryColor, companyFavicon]);
+
+  const heroGradient = companyPrimaryColor
+    ? `linear-gradient(90deg, ${companyPrimaryColor} 0%, #2563eb 55%, #38bdf8 100%)`
+    : undefined;
+
   const [safeUser, setSafeUser] = useState<AuthUser | null>(null);
   const [logoutFn, setLogoutFn] = useState<(() => void) | null>(null);
 
@@ -312,9 +352,6 @@ export default function CompanyHome() {
     ? company.allowed_hotzones
     : undefined;
 
-  const companyName = company.name;
-  const companyLogo = company.logo_url;
-
   return (
     <main className="min-h-screen bg-[#020617] text-white">
       <div className="absolute inset-0 -z-10 overflow-hidden">
@@ -328,7 +365,7 @@ export default function CompanyHome() {
           <div className="alx-card rounded-[32px] border border-white/10 bg-gradient-to-br from-[#2563eb]/15 via-[#a78bfa]/10 to-[#f97316]/10 p-6 backdrop-blur">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-start gap-4">
-                <div className="grid h-14 w-14 shrink-0 place-items-center rounded-[22px] border border-white/10 bg-gradient-to-br from-[#a78bfa] to-[#2563eb] shadow-[0_18px_50px_rgba(167,139,250,0.25)]">
+                <div className="grid h-14 w-14 shrink-0 place-items-center rounded-[22px] border border-white/10 shadow-[0_18px_50px_rgba(167,139,250,0.25)]" style={{ background: heroGradient ?? "linear-gradient(135deg,#a78bfa,#2563eb)" }}>
                   <Sparkles className="h-6 w-6 text-white" />
                 </div>
                 <div>
@@ -342,7 +379,7 @@ export default function CompanyHome() {
                     </span>
                   </h1>
                   <p className="mt-2 text-sm text-slate-300">
-                    Painel operacional · {companyName} · tudo sincronizado em tempo real.
+                    Painel operacional · {companyDisplayName} · tudo sincronizado em tempo real.
                   </p>
                 </div>
               </div>
@@ -386,17 +423,17 @@ export default function CompanyHome() {
                 {companyLogo ? (
                   <img
                     src={companyLogo}
-                    alt={companyName}
+                    alt={companyDisplayName}
                     className="h-24 w-auto rounded-[28px] border border-white/10 bg-black/30 p-3 shadow-[0_18px_70px_rgba(0,0,0,0.45)] sm:h-28"
                   />
                 ) : (
-                  <div className="grid h-24 w-24 place-items-center rounded-[28px] border border-white/10 bg-gradient-to-br from-[#2563eb] to-[#a78bfa] shadow-[0_18px_70px_rgba(0,0,0,0.45)] sm:h-28 sm:w-28">
+                  <div className="grid h-24 w-24 place-items-center rounded-[28px] border border-white/10 shadow-[0_18px_70px_rgba(0,0,0,0.45)] sm:h-28 sm:w-28" style={{ background: heroGradient ?? "linear-gradient(135deg,#2563eb,#a78bfa)" }}>
                     <Building2 className="h-10 w-10 text-white sm:h-12 sm:w-12" />
                   </div>
                 )}
                 <span className="inline-flex items-center gap-2 rounded-full border border-[#2563eb]/30 bg-[#2563eb]/10 px-4 py-2 text-xs uppercase tracking-[0.28em] text-[#dbeafe]">
                   <RadioTower className="h-4 w-4" />
-                  Operacao ao vivo · {companyName}
+                  Operacao ao vivo · {companyDisplayName}
                 </span>
                 <span className="inline-flex items-center gap-2 rounded-full border border-[#a78bfa]/30 bg-[#a78bfa]/10 px-4 py-2 text-xs uppercase tracking-[0.28em] text-[#e9d5ff]">
                   <User className="h-4 w-4" />
@@ -450,7 +487,7 @@ export default function CompanyHome() {
                   Sessao
                 </p>
                 <p className="text-sm font-semibold text-white">
-                  {companyName} · Equipe operacional
+                  {companyDisplayName} · Equipe operacional
                 </p>
                 <button
                   type="button"
@@ -606,7 +643,7 @@ export default function CompanyHome() {
         <footer className="mt-10 rounded-[32px] border border-white/10 bg-black/20 px-6 py-5 backdrop-blur">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-sm font-medium text-white">{companyName}</p>
+              <p className="text-sm font-medium text-white">{companyDisplayName}</p>
               <p className="mt-1 text-sm text-slate-400">
                 Direitos reservados · TWINEX TECH.
               </p>

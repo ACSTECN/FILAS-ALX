@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { LogIn, LoaderCircle, RadioTower, ShieldAlert, UserRound } from "lucide-react";
 import { useCompanyScoped } from "@/hooks/useCompanyScoped";
@@ -10,6 +10,62 @@ export default function CompanyLogin() {
   const location = useLocation();
   const navigate = useNavigate();
   const { loading, error: companyErr, company, stores, analystUsers } = useCompanyScoped(slug);
+
+  const originalMetaRef = useRef<{ title: string } | null>(null);
+  if (!originalMetaRef.current && typeof document !== "undefined") {
+    originalMetaRef.current = { title: document.title };
+  }
+
+  const companyLogo = company?.logo_url ?? null;
+  const companyDisplayName =
+    company?.display_name?.trim() || company?.name || "";
+  const companyPrimaryColor = company?.primary_color?.trim() || null;
+  const companyFavicon = company?.favicon_url?.trim() || null;
+
+  useEffect(() => {
+    if (!company) return;
+    const doc = document;
+    const root = doc.documentElement;
+    const originalTitle = originalMetaRef.current?.title ?? doc.title;
+    doc.title = `${companyDisplayName} | Painel operacional`;
+
+    if (companyPrimaryColor) {
+      root.style.setProperty("--company-primary", companyPrimaryColor);
+    } else {
+      root.style.removeProperty("--company-primary");
+    }
+
+    const existingIcons = Array.from(
+      doc.querySelectorAll("link[rel~='icon'], link[rel~='shortcut icon']"),
+    ) as HTMLLinkElement[];
+    existingIcons.forEach((el) => el.remove());
+
+    if (companyFavicon) {
+      const link = doc.createElement("link");
+      link.rel = "icon";
+      link.href = companyFavicon;
+      doc.head.appendChild(link);
+    }
+
+    return () => {
+      doc.title = originalTitle;
+      root.style.removeProperty("--company-primary");
+      const added = doc.querySelectorAll("link[rel~='icon'], link[rel~='shortcut icon']");
+      added.forEach((el) => el.remove());
+      const defaultFav = doc.createElement("link");
+      defaultFav.rel = "icon";
+      defaultFav.type = "image/png";
+      defaultFav.href = "/logofilas.png";
+      doc.head.appendChild(defaultFav);
+    };
+  }, [company, companyDisplayName, companyPrimaryColor, companyFavicon]);
+
+  const heroGradient = companyPrimaryColor
+    ? `linear-gradient(90deg, ${companyPrimaryColor} 0%, #2563eb 55%, #38bdf8 100%)`
+    : undefined;
+  const glow1 = companyPrimaryColor
+    ? { background: `${companyPrimaryColor}22` }
+    : undefined;
 
   const [safeUser, setSafeUser] = useState<AuthUser | null>(null);
   const [safeLoginError, setSafeLoginError] = useState<string | null>(null);
@@ -119,13 +175,10 @@ export default function CompanyLogin() {
     );
   }
 
-  const companyLogo = company.logo_url;
-  const companyName = company.name;
-
   return (
     <main className="min-h-screen bg-[#020617] text-white">
       <div className="absolute inset-0 -z-10 overflow-hidden">
-        <div className="absolute left-1/4 top-0 h-[420px] w-[420px] rounded-full bg-[#a78bfa]/20 blur-3xl" />
+        <div className="absolute left-1/4 top-0 h-[420px] w-[420px] rounded-full blur-3xl" style={glow1 ?? { background: "rgba(167,139,250,0.20)" }} />
         <div className="absolute right-10 top-24 h-[340px] w-[340px] rounded-full bg-[#2563eb]/25 blur-3xl" />
         <div className="absolute bottom-0 left-0 h-[300px] w-[300px] rounded-full bg-[#f97316]/15 blur-3xl" />
       </div>
@@ -136,11 +189,14 @@ export default function CompanyLogin() {
             {companyLogo ? (
               <img
                 src={companyLogo}
-                alt={companyName}
+                alt={companyDisplayName}
                 className="h-20 w-auto rounded-[28px] border border-white/10 bg-black/30 p-3 shadow-[0_18px_70px_rgba(0,0,0,0.45)] sm:h-24"
               />
             ) : (
-              <div className="grid h-20 w-20 place-items-center rounded-[28px] border border-white/10 bg-gradient-to-br from-[#2563eb] to-[#a78bfa] shadow-[0_18px_70px_rgba(0,0,0,0.45)] sm:h-24 sm:w-24">
+              <div
+                className="grid h-20 w-20 place-items-center rounded-[28px] border border-white/10 shadow-[0_18px_70px_rgba(0,0,0,0.45)] sm:h-24 sm:w-24"
+                style={{ background: heroGradient ?? "linear-gradient(135deg,#2563eb,#a78bfa)" }}
+              >
                 <Building2 className="h-9 w-9 text-white sm:h-11 sm:w-11" />
               </div>
             )}
@@ -151,10 +207,10 @@ export default function CompanyLogin() {
           </div>
 
           <h1 className="mt-6 text-3xl font-semibold leading-tight sm:text-4xl">
-            {companyName} - Painel operacional
+            {companyDisplayName} - Painel operacional
           </h1>
           <p className="mt-3 text-sm leading-7 text-slate-300">
-            Entrada exclusiva para analistas da empresa {companyName}. Cada usuario
+            Entrada exclusiva para analistas da empresa {companyDisplayName}. Cada usuario
             acompanha suas proprias atribuicoes no ranking.
           </p>
 
@@ -216,7 +272,8 @@ export default function CompanyLogin() {
             <button
               type="submit"
               disabled={submitting}
-              className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#2563eb] via-[#38bdf8] to-[#a78bfa] px-5 py-4 text-sm font-semibold text-slate-950 shadow-[0_20px_60px_rgba(37,99,235,0.28)] transition hover:-translate-y-0.5 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
+              className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-4 text-sm font-semibold text-slate-950 shadow-[0_20px_60px_rgba(37,99,235,0.28)] transition hover:-translate-y-0.5 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
+              style={{ background: heroGradient ?? "linear-gradient(90deg,#2563eb 0%,#38bdf8 55%,#a78bfa 100%)" }}
             >
               {submitting ? (
                 <>

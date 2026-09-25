@@ -56,6 +56,46 @@ export default function CompanyEntregador() {
     stores,
   } = useCompanyScoped(slug);
 
+  const originalMetaRef = useRef<{ title: string } | null>(null);
+  if (!originalMetaRef.current && typeof document !== "undefined") {
+    originalMetaRef.current = { title: document.title };
+  }
+
+  const companyLogo = company?.logo_url ?? null;
+  const companyDisplayName = company?.display_name?.trim() || company?.name || "";
+  const companyPrimaryColor = company?.primary_color?.trim() || null;
+  const companyFavicon = company?.favicon_url?.trim() || null;
+
+  useEffect(() => {
+    if (!company) return;
+    const doc = document;
+    const root = doc.documentElement;
+    const originalTitle = originalMetaRef.current?.title ?? doc.title;
+    doc.title = `${companyDisplayName} | Portal do entregador`;
+    if (companyPrimaryColor) { root.style.setProperty("--company-primary", companyPrimaryColor); }
+    else { root.style.removeProperty("--company-primary"); }
+    const existingIcons = Array.from(doc.querySelectorAll("link[rel~='icon'], link[rel~='shortcut icon']")) as HTMLLinkElement[];
+    existingIcons.forEach((el) => el.remove());
+    if (companyFavicon) {
+      const link = doc.createElement("link");
+      link.rel = "icon"; link.href = companyFavicon;
+      doc.head.appendChild(link);
+    }
+    return () => {
+      doc.title = originalTitle;
+      root.style.removeProperty("--company-primary");
+      const added = doc.querySelectorAll("link[rel~='icon'], link[rel~='shortcut icon']");
+      added.forEach((el) => el.remove());
+      const defaultFav = doc.createElement("link");
+      defaultFav.rel = "icon"; defaultFav.type = "image/png"; defaultFav.href = "/logofilas.png";
+      doc.head.appendChild(defaultFav);
+    };
+  }, [company, companyDisplayName, companyPrimaryColor, companyFavicon]);
+
+  const heroGradient = companyPrimaryColor
+    ? `linear-gradient(90deg, ${companyPrimaryColor} 0%, #2563eb 55%, #38bdf8 100%)`
+    : undefined;
+
   const [safeAuthUser, setSafeAuthUser] = useState<AuthUser | null>(null);
   const safeLoginEntregadorRef = useRef<((cpf: string) => boolean) | null>(null);
   const [safeLoginError, setSafeLoginError] = useState<string | null>(null);
@@ -397,7 +437,7 @@ export default function CompanyEntregador() {
               <div>
                 <h1 className="text-xl font-semibold text-white">Portal fechado</h1>
                 <p className="mt-2 text-sm text-slate-300">
-                  O portal do entregador nao esta habilitado para {company.name} no momento.
+                  O portal do entregador nao esta habilitado para {company.display_name?.trim() || company.name} no momento.
                 </p>
                 <button
                   type="button"
@@ -414,9 +454,6 @@ export default function CompanyEntregador() {
     );
   }
 
-  const companyName = company.name;
-  const companyLogo = company.logo_url;
-
   return (
     <main className="min-h-screen bg-[#020617] pb-20 pt-12 text-white">
       <div className="absolute inset-0 -z-10 overflow-hidden">
@@ -432,17 +469,17 @@ export default function CompanyEntregador() {
               {companyLogo ? (
                 <img
                   src={companyLogo}
-                  alt={companyName}
+                  alt={companyDisplayName}
                   className="h-16 w-auto rounded-[20px] border border-white/10 bg-black/30 p-2.5 shadow-[0_18px_70px_rgba(0,0,0,0.45)]"
                 />
               ) : (
-                <div className="grid h-16 w-16 place-items-center rounded-[20px] border border-white/10 bg-gradient-to-br from-[#f97316] to-[#a78bfa] p-2.5 shadow-[0_18px_70px_rgba(0,0,0,0.45)]">
+                <div className="grid h-16 w-16 place-items-center rounded-[20px] border border-white/10 p-2.5 shadow-[0_18px_70px_rgba(0,0,0,0.45)]" style={{ background: heroGradient ?? "linear-gradient(135deg,#f97316,#a78bfa)" }}>
                   <Building2 className="h-8 w-8 text-white" />
                 </div>
               )}
               <span className="inline-flex items-center gap-2 rounded-full border border-[#f97316]/30 bg-[#f97316]/10 px-4 py-2 text-[11px] uppercase tracking-[0.28em] text-[#ffedd5]">
                 <ShieldCheck className="h-3.5 w-3.5" />
-                Area exclusiva do entregador · {companyName}
+                Area exclusiva do entregador · {companyDisplayName}
               </span>
             </div>
             <button
@@ -458,7 +495,7 @@ export default function CompanyEntregador() {
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
             Informe seu CPF para visualizar seus agendamentos e cadastrar novas datas de
-            interesse para a equipe {companyName}.
+            interesse para a equipe {companyDisplayName}.
           </p>
         </header>
 
@@ -502,7 +539,8 @@ export default function CompanyEntregador() {
                 <button
                   type="submit"
                   disabled={cpfLoading}
-                  className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#f97316] via-[#fb923c] to-[#f97316] px-5 py-4 text-sm font-semibold text-slate-950 shadow-[0_20px_60px_rgba(249,115,22,0.3)] transition hover:-translate-y-0.5 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
+                  className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-4 text-sm font-semibold text-slate-950 shadow-[0_20px_60px_rgba(249,115,22,0.3)] transition hover:-translate-y-0.5 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
+                  style={{ background: heroGradient ?? "linear-gradient(90deg,#f97316 0%,#fb923c 55%,#f97316 100%)" }}
                 >
                   {cpfLoading ? (
                     <>
@@ -641,7 +679,7 @@ export default function CompanyEntregador() {
                       <p className="text-slate-200">
                         Ao cadastrar este interesse de agenda, voce confirma que esta de
                         acordo com a data e o turno informados. Caso surja uma oportunidade
-                        na sua hotzone, a equipe {companyName} entrara em contato com voce
+                        na sua hotzone, a equipe {companyDisplayName} entrara em contato com voce
                         para confirmar e seguir com o atendimento.
                       </p>
                       <label className="flex items-start gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-slate-200">
@@ -652,7 +690,7 @@ export default function CompanyEntregador() {
                           className="mt-0.5 h-4 w-4 rounded border-white/20 bg-white/10 text-[#f97316] focus:ring-[#f97316]"
                         />
                         <span>
-                          Tenho certeza do interesse informado e autorizo a equipe {companyName}
+                          Tenho certeza do interesse informado e autorizo a equipe {companyDisplayName}
                           a entrar em contato caso haja oportunidade nesta data.
                         </span>
                       </label>
@@ -681,7 +719,8 @@ export default function CompanyEntregador() {
                 <button
                   type="submit"
                   disabled={safeSyncing || safeLoading || cityHotzones.length === 0}
-                  className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#f97316] via-[#fb923c] to-[#f97316] px-5 py-4 text-sm font-semibold text-slate-950 shadow-[0_20px_60px_rgba(249,115,22,0.3)] transition hover:-translate-y-0.5 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
+                  className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-4 text-sm font-semibold text-slate-950 shadow-[0_20px_60px_rgba(249,115,22,0.3)] transition hover:-translate-y-0.5 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
+                  style={{ background: heroGradient ?? "linear-gradient(90deg,#f97316 0%,#fb923c 55%,#f97316 100%)" }}
                 >
                   {safeSyncing ? (
                     <>

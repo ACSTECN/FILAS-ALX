@@ -15,7 +15,10 @@ const ALL_HOTZONES = hotzonesByCity[cityOptions[0]].concat(hotzonesByCity[cityOp
 export function CompanyForm({ initial, submitting, onSubmit, onCancel }: Props) {
   const [slug, setSlug] = useState(initial?.slug ?? "");
   const [name, setName] = useState(initial?.name ?? "");
+  const [displayName, setDisplayName] = useState(initial?.display_name ?? "");
   const [logoUrl, setLogoUrl] = useState(initial?.logo_url ?? "");
+  const [faviconUrl, setFaviconUrl] = useState(initial?.favicon_url ?? "");
+  const [primaryColor, setPrimaryColor] = useState(initial?.primary_color ?? "#a78bfa");
   const [isActive, setIsActive] = useState(initial?.is_active ?? true);
   const [maxUsers, setMaxUsers] = useState(String(initial?.max_users ?? 5));
   const [enableFila, setEnableFila] = useState(initial?.enable_fila ?? true);
@@ -41,7 +44,10 @@ export function CompanyForm({ initial, submitting, onSubmit, onCancel }: Props) 
         await onSubmit({
           slug,
           name,
+          display_name: displayName || null,
           logo_url: logoUrl || null,
+          favicon_url: faviconUrl || null,
+          primary_color: primaryColor || null,
           is_active: isActive,
           max_users: Number(maxUsers) || 0,
           enable_fila: enableFila,
@@ -55,7 +61,7 @@ export function CompanyForm({ initial, submitting, onSubmit, onCancel }: Props) 
     >
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block space-y-2 text-sm text-slate-300">
-          <span>Nome da empresa</span>
+          <span>Nome da empresa (banco)</span>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -74,17 +80,79 @@ export function CompanyForm({ initial, submitting, onSubmit, onCancel }: Props) 
         </label>
       </div>
 
+      <div className="rounded-[20px] border border-white/10 bg-black/15 p-4">
+        <p className="mb-3 text-xs uppercase tracking-[0.22em] text-slate-400">
+          Identidade visual (layout / logo / cor)
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block space-y-2 text-sm text-slate-300 sm:col-span-2">
+            <span>Nome de exibicao (mostrado no login e topo do painel)</span>
+            <input
+              value={displayName ?? ""}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder={name ? name : "Ex.: Fox Logistica"}
+              className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none focus:border-[#a78bfa]/60"
+            />
+          </label>
+          <label className="block space-y-2 text-sm text-slate-300 sm:col-span-2">
+            <span>Logo URL (opcional, aparecera no login e header)</span>
+            <input
+              value={logoUrl ?? ""}
+              onChange={(e) => setLogoUrl(e.target.value)}
+              placeholder="https://.../logo.png (PNG/JPG transparente recomendado)"
+              className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none focus:border-[#a78bfa]/60"
+            />
+          </label>
+          <label className="block space-y-2 text-sm text-slate-300">
+            <span>Favicon URL (opcional, icone na aba do navegador)</span>
+            <input
+              value={faviconUrl ?? ""}
+              onChange={(e) => setFaviconUrl(e.target.value)}
+              placeholder="https://.../favicon.ico ou PNG 32x32"
+              className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none focus:border-[#a78bfa]/60"
+            />
+          </label>
+          <label className="block space-y-2 text-sm text-slate-300">
+            <span>Cor primaria (botoes, destaques)</span>
+            <div className="flex items-center gap-3 rounded-2xl border border-white/10 px-3 py-2">
+              <input
+                type="color"
+                value={primaryColor ?? "#a78bfa"}
+                onChange={(e) => setPrimaryColor(e.target.value)}
+                className="h-10 w-14 cursor-pointer rounded-xl border border-white/10 bg-transparent"
+              />
+              <input
+                value={primaryColor ?? ""}
+                onChange={(e) => setPrimaryColor(e.target.value)}
+                className="alx-field flex-1 border-none bg-transparent px-2 py-2 text-white outline-none"
+              />
+            </div>
+          </label>
+        </div>
+        {logoUrl ? (
+          <div className="mt-4 flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div className="grid h-16 w-16 shrink-0 place-items-center rounded-xl bg-black/40 p-2">
+              <img src={logoUrl} alt="preview logo" className="max-h-12 max-w-full object-contain" />
+            </div>
+            <div className="flex-1 space-y-3">
+              <button
+                type="button"
+                className="rounded-xl px-4 py-2 text-sm font-semibold text-white shadow"
+                style={{ background: `linear-gradient(90deg, ${primaryColor} 0%, #2563eb 100%)` }}
+              >
+                Botao preview
+              </button>
+              <p className="text-xs text-slate-400">
+                Preview logo + cor primaria usada no login e dashboard.
+              </p>
+            </div>
+          </div>
+        ) : null}
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2">
-        <label className="block space-y-2 text-sm text-slate-300">
-          <span>Logo URL (opcional)</span>
-          <input
-            value={logoUrl ?? ""}
-            onChange={(e) => setLogoUrl(e.target.value)}
-            className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none focus:border-[#a78bfa]/60"
-          />
-        </label>
-        <label className="block space-y-2 text-sm text-slate-300">
-          <span>Limite max. de usuarios (analistas)</span>
+        <div>
+          <label className="mb-2 block text-sm text-slate-300">Limite max. de usuarios (analistas)</label>
           <input
             type="number"
             min={0}
@@ -92,7 +160,32 @@ export function CompanyForm({ initial, submitting, onSubmit, onCancel }: Props) 
             onChange={(e) => setMaxUsers(e.target.value)}
             className="alx-field w-full rounded-2xl border border-white/10 px-4 py-3 text-white outline-none focus:border-[#a78bfa]/60"
           />
-        </label>
+        </div>
+        <div className="grid place-items-end">
+          <label className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold text-white">Empresa ativa</p>
+              <p className="text-xs text-slate-400">
+                Desative para bloquear login e portais dessa empresa.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsActive(!isActive)}
+              className={`h-6 w-11 rounded-full border border-white/10 transition ${
+                isActive
+                  ? "bg-gradient-to-r from-[#22c55e] to-[#38bdf8]"
+                  : "bg-white/10"
+              }`}
+            >
+              <span
+                className={`block h-5 w-5 rounded-full bg-white shadow transition ${
+                  isActive ? "translate-x-5" : "translate-x-0.5"
+                }`}
+              />
+            </button>
+          </label>
+        </div>
       </div>
 
       <div className="rounded-[20px] border border-white/10 bg-black/15 p-4">

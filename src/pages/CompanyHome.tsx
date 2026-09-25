@@ -108,6 +108,7 @@ export default function CompanyHome() {
     : undefined;
 
   const [safeUser, setSafeUser] = useState<AuthUser | null>(null);
+  const [authHydrated, setAuthHydrated] = useState<boolean>(false);
   const [logoutFn, setLogoutFn] = useState<(() => void) | null>(null);
 
   const [safeQueue, setSafeQueue] = useState<QueueRecord[]>([]);
@@ -127,6 +128,7 @@ export default function CompanyHome() {
   useEffect(() => {
     if (!stores) {
       setSafeUser(null);
+      setAuthHydrated(true);
       setLogoutFn(null);
       setSafeQueue([]);
       setSafeFilters(DEFAULT_FILTERS);
@@ -146,31 +148,36 @@ export default function CompanyHome() {
     const useAuthStore = stores.auth.useCompanyAuthStore;
     const useQueueStore = stores.queue;
 
+    const initialAuth = useAuthStore.getState();
+    setSafeUser(initialAuth.user);
+    setLogoutFn(initialAuth.logout);
+
     const unsubUser = useAuthStore.subscribe((s) => setSafeUser(s.user));
-    setSafeUser(useAuthStore.getState().user);
     const unsubLogout = useAuthStore.subscribe((s) => setLogoutFn(() => s.logout));
-    setLogoutFn(useAuthStore.getState().logout);
+
+    const initialQueue = useQueueStore.getState();
+    setSafeQueue(initialQueue.queue);
+    setSafeFilters(initialQueue.filters);
+    setSafeLoadingQ(initialQueue.loading);
+    setSafeSyncing(initialQueue.syncing);
+    setSafeErrorQ(initialQueue.error);
+    setSafeAnalystName(initialQueue.analystName);
 
     const unsubQueue = useQueueStore.subscribe((s) => setSafeQueue(s.queue));
-    setSafeQueue(useQueueStore.getState().queue);
     const unsubFilters = useQueueStore.subscribe((s) => setSafeFilters(s.filters));
-    setSafeFilters(useQueueStore.getState().filters);
     const unsubLoading = useQueueStore.subscribe((s) => setSafeLoadingQ(s.loading));
-    setSafeLoadingQ(useQueueStore.getState().loading);
     const unsubSyncing = useQueueStore.subscribe((s) => setSafeSyncing(s.syncing));
-    setSafeSyncing(useQueueStore.getState().syncing);
     const unsubError = useQueueStore.subscribe((s) => setSafeErrorQ(s.error));
-    setSafeErrorQ(useQueueStore.getState().error);
     const unsubAnalystName = useQueueStore.subscribe((s) => setSafeAnalystName(s.analystName));
-    setSafeAnalystName(useQueueStore.getState().analystName);
 
-    const state = useQueueStore.getState();
-    loadQueueRef.current = state.loadQueue;
-    setFiltersRef.current = state.setFilters;
-    setAnalystNameRef.current = state.setAnalystName;
-    createRecordRef.current = state.createRecord;
-    removeRecordRef.current = state.removeRecord;
-    assignRecordRef.current = state.assignRecord;
+    loadQueueRef.current = initialQueue.loadQueue;
+    setFiltersRef.current = initialQueue.setFilters;
+    setAnalystNameRef.current = initialQueue.setAnalystName;
+    createRecordRef.current = initialQueue.createRecord;
+    removeRecordRef.current = initialQueue.removeRecord;
+    assignRecordRef.current = initialQueue.assignRecord;
+
+    setAuthHydrated(true);
 
     return () => {
       unsubUser();
@@ -291,7 +298,7 @@ export default function CompanyHome() {
     };
   }, [company, stores]);
 
-  if (loading || !company) {
+  if (!authHydrated || loading || !company) {
     return (
       <main className="min-h-screen bg-[#020617] text-white">
         <div className="flex min-h-screen items-center justify-center">

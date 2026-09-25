@@ -97,6 +97,7 @@ export default function CompanyEntregador() {
     : undefined;
 
   const [safeAuthUser, setSafeAuthUser] = useState<AuthUser | null>(null);
+  const [authHydrated, setAuthHydrated] = useState<boolean>(false);
   const safeLoginEntregadorRef = useRef<((cpf: string) => boolean) | null>(null);
   const [safeLoginError, setSafeLoginError] = useState<string | null>(null);
 
@@ -114,6 +115,7 @@ export default function CompanyEntregador() {
   useEffect(() => {
     if (!stores) {
       setSafeAuthUser(null);
+      setAuthHydrated(true);
       safeLoginEntregadorRef.current = null;
       setSafeLoginError(null);
       setSafeQueue([]);
@@ -131,29 +133,33 @@ export default function CompanyEntregador() {
     const useAuthStore = stores.auth.useCompanyAuthStore;
     const useQueueStore = stores.queue;
 
+    const initialAuth = useAuthStore.getState();
+    setSafeAuthUser(initialAuth.user);
+    setSafeLoginError(initialAuth.loginError);
+    safeLoginEntregadorRef.current = initialAuth.loginEntregador;
+
     const unsubAuthUser = useAuthStore.subscribe((s) => setSafeAuthUser(s.user));
-    setSafeAuthUser(useAuthStore.getState().user);
     const unsubLoginError = useAuthStore.subscribe((s) => setSafeLoginError(s.loginError));
-    setSafeLoginError(useAuthStore.getState().loginError);
-    const authState = useAuthStore.getState();
-    safeLoginEntregadorRef.current = authState.loginEntregador;
+
+    const initialQueue = useQueueStore.getState();
+    setSafeQueue(initialQueue.queue);
+    setSafeLoading(initialQueue.loading);
+    setSafeSyncing(initialQueue.syncing);
+    setSafeError(initialQueue.error);
+    setSafeFilters(initialQueue.filters);
 
     const unsubQueue = useQueueStore.subscribe((s) => setSafeQueue(s.queue));
-    setSafeQueue(useQueueStore.getState().queue);
     const unsubLoading = useQueueStore.subscribe((s) => setSafeLoading(s.loading));
-    setSafeLoading(useQueueStore.getState().loading);
     const unsubSyncing = useQueueStore.subscribe((s) => setSafeSyncing(s.syncing));
-    setSafeSyncing(useQueueStore.getState().syncing);
     const unsubError = useQueueStore.subscribe((s) => setSafeError(s.error));
-    setSafeError(useQueueStore.getState().error);
     const unsubFilters = useQueueStore.subscribe((s) => setSafeFilters(s.filters));
-    setSafeFilters(useQueueStore.getState().filters);
 
-    const queueState = useQueueStore.getState();
-    loadEntregadorQueueRef.current = queueState.loadEntregadorQueue;
-    createRecordRef.current = queueState.createRecord;
-    setFiltersRef.current = queueState.setFilters;
+    loadEntregadorQueueRef.current = initialQueue.loadEntregadorQueue;
+    createRecordRef.current = initialQueue.createRecord;
+    setFiltersRef.current = initialQueue.setFilters;
     queueStoreGetStateRef.current = useQueueStore.getState;
+
+    setAuthHydrated(true);
 
     return () => {
       unsubAuthUser();
@@ -385,7 +391,7 @@ export default function CompanyEntregador() {
     }
   };
 
-  if (scopedLoading || !company) {
+  if (!authHydrated || scopedLoading || !company) {
     return (
       <main className="min-h-screen bg-[#020617] text-white">
         <div className="flex min-h-screen items-center justify-center">

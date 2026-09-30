@@ -68,7 +68,7 @@ export default function CompanyEntregador() {
         const raw = window.localStorage.getItem(storageKey);
         if (raw) {
           const parsed = JSON.parse(raw) as AuthUser;
-          if (parsed && parsed.companyId === company.id && parsed.role === "entregador") {
+          if (parsed && parsed.companyId === company.id) {
             useAuth.setState({ user: parsed });
             effectiveUser = parsed;
           }
@@ -78,8 +78,15 @@ export default function CompanyEntregador() {
       }
     }
 
-    if (effectiveUser && effectiveUser.role !== "entregador") {
-      navigate(`/c/${slug}/login`, { replace: true });
+    if (effectiveUser) {
+      if (effectiveUser.role === "operacional") {
+        navigate(`/c/${slug}/`, { replace: true });
+        return;
+      }
+      if (effectiveUser.role !== "entregador") {
+        navigate(`/c/${slug}/login`, { replace: true });
+        return;
+      }
     }
   }, [stores, company, slug, navigate]);
 
@@ -426,6 +433,22 @@ export default function CompanyEntregador() {
     }
   };
 
+  if (
+    liveAuthUser?.role === "operacional" ||
+    (liveAuthUser && liveAuthUser.role !== "entregador")
+  ) {
+    return (
+      <main className="min-h-screen bg-[#020617] text-white">
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="flex items-center gap-3 text-slate-300">
+            <LoaderCircle className="h-5 w-5 animate-spin" />
+            Redirecionando...
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   if (!stores || scopedLoading || !company) {
     return (
       <main className="min-h-screen bg-[#020617] text-white">
@@ -525,13 +548,6 @@ export default function CompanyEntregador() {
                 Area exclusiva do entregador · {companyDisplayName}
               </span>
             </div>
-            <button
-              type="button"
-              onClick={() => navigate(`/c/${slug}/login`, { replace: true })}
-              className="inline-flex items-center gap-2 rounded-2xl border border-white/10 px-4 py-3 text-xs uppercase tracking-[0.22em] text-slate-200 transition hover:border-white/20 hover:text-white"
-            >
-              Acesso equipe
-            </button>
           </div>
           <h1 className="mt-6 text-3xl font-semibold leading-tight sm:text-4xl">
             Agende sua data de interesse.

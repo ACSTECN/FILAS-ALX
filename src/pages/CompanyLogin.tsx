@@ -126,11 +126,13 @@ export default function CompanyLogin() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!loginOperacionalRef.current) return;
+    if (!loginOperacionalRef.current || !stores) return;
     setSubmitting(true);
     try {
       const ok = await loginOperacionalRef.current(analystName, password);
-      if (ok) navigate(from ?? homePath, { replace: true });
+      const liveCheck = stores.auth.useCompanyAuthStore.getState();
+      const reallyLoggedIn = ok && liveCheck.user && liveCheck.user.role === "operacional";
+      if (reallyLoggedIn) navigate(from ?? homePath, { replace: true });
     } finally {
       setSubmitting(false);
     }

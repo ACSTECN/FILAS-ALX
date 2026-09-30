@@ -298,7 +298,7 @@ export default function CompanyHome() {
     };
   }, [company, stores]);
 
-  if (!authHydrated || loading || !company) {
+  if (!stores || loading || !company) {
     return (
       <main className="min-h-screen bg-[#020617] text-white">
         <div className="flex min-h-screen items-center justify-center">
@@ -310,6 +310,11 @@ export default function CompanyHome() {
       </main>
     );
   }
+
+  const authStore = stores.auth.useCompanyAuthStore;
+  const currentAuthState = authStore.getState();
+  const liveUser = currentAuthState.user ?? safeUser;
+  const liveLogout = currentAuthState.logout ?? logoutFn;
 
   if (companyErr) {
     return (
@@ -338,7 +343,7 @@ export default function CompanyHome() {
     );
   }
 
-  if (!safeUser || safeUser.role !== "operacional") {
+  if (!liveUser || liveUser.role !== "operacional") {
     return <Navigate to={`/c/${slug}/login`} replace />;
   }
 
@@ -499,7 +504,7 @@ export default function CompanyHome() {
                 <button
                   type="button"
                   onClick={() => {
-                    if (logoutFn) logoutFn();
+                    if (liveLogout) liveLogout();
                     navigate(`/c/${slug}/login`, { replace: true });
                   }}
                   className="mt-1 inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 px-4 py-3 text-sm text-slate-200 transition hover:border-white/20 hover:text-white"

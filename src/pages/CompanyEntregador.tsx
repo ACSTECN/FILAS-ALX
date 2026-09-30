@@ -96,6 +96,10 @@ export default function CompanyEntregador() {
     ? `linear-gradient(90deg, ${companyPrimaryColor} 0%, #2563eb 55%, #38bdf8 100%)`
     : undefined;
 
+  const liveAuthUser = stores
+    ? stores.auth.useCompanyAuthStore.getState().user
+    : null;
+
   const [safeAuthUser, setSafeAuthUser] = useState<AuthUser | null>(null);
   const [authHydrated, setAuthHydrated] = useState<boolean>(false);
   const safeLoginEntregadorRef = useRef<((cpf: string) => boolean) | null>(null);
@@ -173,9 +177,7 @@ export default function CompanyEntregador() {
   }, [stores]);
 
   const [cpf, setCpf] = useState("");
-  const [cpfConfirmado, setCpfConfirmado] = useState<string | null>(
-    safeAuthUser?.role === "entregador" ? safeAuthUser.identifier : null,
-  );
+  const [cpfConfirmado, setCpfConfirmado] = useState<string | null>(null);
   const [cidade, setCidade] = useState<City>("Rio de Janeiro");
   const [hotzone, setHotzone] = useState<Hotzone>(hotzonesByCity["Rio de Janeiro"][0]);
   const [turno, setTurno] = useState<Shift>("Manhã");
@@ -227,6 +229,12 @@ export default function CompanyEntregador() {
       navigate(`/c/${slug}/entregador`, { replace: true });
     }
   }, [location.pathname, navigate, slug]);
+
+  useEffect(() => {
+    if (liveAuthUser?.role === "entregador" && !cpfConfirmado) {
+      setCpfConfirmado(liveAuthUser.identifier);
+    }
+  }, [liveAuthUser, cpfConfirmado]);
 
   useEffect(() => {
     if (cpfConfirmado && loadEntregadorQueueRef.current) {
@@ -391,7 +399,7 @@ export default function CompanyEntregador() {
     }
   };
 
-  if (!authHydrated || scopedLoading || !company) {
+  if (!stores || scopedLoading || !company) {
     return (
       <main className="min-h-screen bg-[#020617] text-white">
         <div className="flex min-h-screen items-center justify-center">
@@ -403,6 +411,8 @@ export default function CompanyEntregador() {
       </main>
     );
   }
+
+  const liveCpf = liveAuthUser?.role === "entregador" ? liveAuthUser.identifier : cpfConfirmado;
 
   if (companyErr) {
     return (

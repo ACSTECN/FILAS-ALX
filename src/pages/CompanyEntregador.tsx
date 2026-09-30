@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState, useRef } from "react";
+import { FormEvent, useEffect, useLayoutEffect, useMemo, useState, useRef } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   AlertTriangle,
@@ -55,6 +55,33 @@ export default function CompanyEntregador() {
     company,
     stores,
   } = useCompanyScoped(slug);
+
+  useLayoutEffect(() => {
+    if (!stores || !company) return;
+    const useAuth = stores.auth.useCompanyAuthStore;
+    const state = useAuth.getState();
+    const storageKey = `alx-auth-session-${slug.trim().toLowerCase()}`;
+    let effectiveUser: AuthUser | null = state.user;
+
+    if (!effectiveUser) {
+      try {
+        const raw = window.localStorage.getItem(storageKey);
+        if (raw) {
+          const parsed = JSON.parse(raw) as AuthUser;
+          if (parsed && parsed.companyId === company.id && parsed.role === "entregador") {
+            useAuth.setState({ user: parsed });
+            effectiveUser = parsed;
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
+    if (effectiveUser && effectiveUser.role !== "entregador") {
+      navigate(`/c/${slug}/login`, { replace: true });
+    }
+  }, [stores, company, slug, navigate]);
 
   const originalMetaRef = useRef<{ title: string } | null>(null);
   if (!originalMetaRef.current && typeof document !== "undefined") {

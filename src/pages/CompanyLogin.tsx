@@ -1,5 +1,5 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
+import { FormEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { LogIn, LoaderCircle, RadioTower, ShieldAlert, UserRound } from "lucide-react";
 import { useCompanyScoped } from "@/hooks/useCompanyScoped";
 import { Building2 } from "lucide-react";
@@ -10,6 +10,44 @@ export default function CompanyLogin() {
   const location = useLocation();
   const navigate = useNavigate();
   const { loading, error: companyErr, company, stores, analystUsers } = useCompanyScoped(slug);
+
+  const from =
+    (location.state as { from?: { pathname?: string } } | null)?.from
+      ?.pathname ?? null;
+  const homePath = `/c/${slug}/`;
+  const entregadorPath = `/c/${slug}/entregador`;
+
+  useLayoutEffect(() => {
+    if (!stores || !company) return;
+    const useAuth = stores.auth.useCompanyAuthStore;
+    const state = useAuth.getState();
+    const storageKey = `alx-auth-session-${slug.trim().toLowerCase()}`;
+    let effectiveUser: AuthUser | null = state.user;
+
+    if (!effectiveUser) {
+      try {
+        const raw = window.localStorage.getItem(storageKey);
+        if (raw) {
+          const parsed = JSON.parse(raw) as AuthUser;
+          if (parsed && parsed.companyId === company.id) {
+            useAuth.setState({ user: parsed });
+            effectiveUser = parsed;
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
+    if (effectiveUser?.role === "operacional") {
+      navigate(from ?? homePath, { replace: true });
+      return;
+    }
+    if (effectiveUser?.role === "entregador") {
+      navigate(entregadorPath, { replace: true });
+      return;
+    }
+  }, [stores, company, slug, from, homePath, entregadorPath, navigate]);
 
   const originalMetaRef = useRef<{ title: string } | null>(null);
   if (!originalMetaRef.current && typeof document !== "undefined") {
@@ -106,23 +144,6 @@ export default function CompanyLogin() {
       setAnalystName(analysts[0].name);
     }
   }, [analysts, analystName]);
-
-  const from =
-    (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ??
-    null;
-
-  const homePath = useMemo(() => (slug ? `/c/${slug}/` : "/"), [slug]);
-  const entregadorPath = useMemo(
-    () => (slug ? `/c/${slug}/entregador` : "/entregador"),
-    [slug],
-  );
-
-  if (!loading && authHydrated && stores && safeUser?.role === "operacional") {
-    return <Navigate to={from ?? homePath} replace />;
-  }
-  if (!loading && authHydrated && stores && safeUser?.role === "entregador") {
-    return <Navigate to={entregadorPath} replace />;
-  }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

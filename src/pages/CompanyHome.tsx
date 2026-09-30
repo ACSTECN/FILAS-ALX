@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, useRef } from "react";
-import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { useEffect, useLayoutEffect, useMemo, useState, useRef } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   BellElectric,
   Building2,
@@ -66,6 +66,39 @@ export default function CompanyHome() {
   const navigate = useNavigate();
   const { loading, error: companyErr, company, analystUsers, stores } =
     useCompanyScoped(slug);
+
+  const authCheckedRef = useRef(false);
+
+  useLayoutEffect(() => {
+    authCheckedRef.current = false;
+    if (!stores || !company) return;
+    const useAuth = stores.auth.useCompanyAuthStore;
+    const state = useAuth.getState();
+
+    if (!state.user || state.user.role !== "operacional") {
+      const storageKey = `alx-auth-session-${slug.trim().toLowerCase()}`;
+      try {
+        const raw = window.localStorage.getItem(storageKey);
+        if (raw) {
+          const parsed = JSON.parse(raw) as AuthUser;
+          if (
+            parsed &&
+            parsed.companyId === company.id &&
+            parsed.role === "operacional"
+          ) {
+            useAuth.setState({ user: parsed });
+            authCheckedRef.current = true;
+            return;
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+      navigate(`/c/${slug}/login`, { replace: true });
+      return;
+    }
+    authCheckedRef.current = true;
+  }, [stores, company, navigate, slug]);
 
   const originalMetaRef = useRef<{ title: string } | null>(null);
   if (!originalMetaRef.current && typeof document !== "undefined") {
@@ -341,10 +374,6 @@ export default function CompanyHome() {
         </div>
       </main>
     );
-  }
-
-  if (!liveUser || liveUser.role !== "operacional") {
-    return <Navigate to={`/c/${slug}/login`} replace />;
   }
 
   const changeCity = (city: City) => {

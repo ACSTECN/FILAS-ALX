@@ -69,7 +69,8 @@ export default function CompanyLogin() {
 
   const [safeUser, setSafeUser] = useState<AuthUser | null>(null);
   const [safeLoginError, setSafeLoginError] = useState<string | null>(null);
-  const [loginOperacionalFn, setLoginOperacionalFn] = useState<
+  const [authHydrated, setAuthHydrated] = useState(false);
+  const loginOperacionalRef = useRef<
     ((name: string, password: string) => Promise<boolean>) | null
   >(null);
 
@@ -77,7 +78,8 @@ export default function CompanyLogin() {
     if (!stores) {
       setSafeUser(null);
       setSafeLoginError(null);
-      setLoginOperacionalFn(null);
+      setAuthHydrated(false);
+      loginOperacionalRef.current = null;
       return;
     }
     const useStore = stores.auth.useCompanyAuthStore;
@@ -85,9 +87,11 @@ export default function CompanyLogin() {
       setSafeUser(state.user);
       setSafeLoginError(state.loginError);
     });
-    setSafeUser(useStore.getState().user);
-    setSafeLoginError(useStore.getState().loginError);
-    setLoginOperacionalFn(() => useStore.getState().loginOperacional);
+    const initial = useStore.getState();
+    setSafeUser(initial.user);
+    setSafeLoginError(initial.loginError);
+    loginOperacionalRef.current = initial.loginOperacional;
+    setAuthHydrated(true);
     return () => unsubscribe();
   }, [stores]);
 
@@ -113,19 +117,19 @@ export default function CompanyLogin() {
     [slug],
   );
 
-  if (!loading && stores && safeUser?.role === "operacional") {
+  if (!loading && authHydrated && stores && safeUser?.role === "operacional") {
     return <Navigate to={from ?? homePath} replace />;
   }
-  if (!loading && stores && safeUser?.role === "entregador") {
+  if (!loading && authHydrated && stores && safeUser?.role === "entregador") {
     return <Navigate to={entregadorPath} replace />;
   }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!loginOperacionalFn) return;
+    if (!loginOperacionalRef.current) return;
     setSubmitting(true);
     try {
-      const ok = await loginOperacionalFn(analystName, password);
+      const ok = await loginOperacionalRef.current(analystName, password);
       if (ok) navigate(from ?? homePath, { replace: true });
     } finally {
       setSubmitting(false);

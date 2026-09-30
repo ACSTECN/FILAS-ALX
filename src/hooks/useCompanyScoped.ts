@@ -6,6 +6,23 @@ import type { Hotzone } from "@/types/queue";
 import { createCompanyQueueStore } from "@/store/companyQueueStore";
 import { makeCompanyAuthStores } from "@/store/companyAuthStore";
 
+type AuthStores = ReturnType<typeof makeCompanyAuthStores>;
+type QueueStore = ReturnType<typeof createCompanyQueueStore>;
+type ScopedStores = { auth: AuthStores; queue: QueueStore };
+
+const storesCache = new Map<string, ScopedStores>();
+
+function getOrCreateStores(company: Company): ScopedStores {
+  const key = company.id;
+  const cached = storesCache.get(key);
+  if (cached) return cached;
+  const auth = makeCompanyAuthStores(company.slug, company.id);
+  const queue = createCompanyQueueStore(company.id, company.slug);
+  const next: ScopedStores = { auth, queue };
+  storesCache.set(key, next);
+  return next;
+}
+
 export function useCompanyScoped(slug: string) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -85,10 +102,8 @@ export function useCompanyScoped(slug: string) {
 
   const stores = useMemo(() => {
     if (!company) return null;
-    const auth = makeCompanyAuthStores(company.slug, company.id);
-    const queue = createCompanyQueueStore(company.id, company.slug);
-    return { auth, queue };
-  }, [company]);
+    return getOrCreateStores(company);
+  }, [company?.id]);
 
   return {
     loading,
